@@ -243,6 +243,7 @@ namespace TrackingSmoothing {
                 else if (split[0].Equals("camera1Width")) { if (Tag.cameras.Length > 1) { Tag.cameras[1].width = int.Parse(split[1]); } }
                 else if (split[0].Equals("camera0Height")) { if (Tag.cameras.Length > 0) { Tag.cameras[0].height = int.Parse(split[1]); } }
                 else if (split[0].Equals("camera1Height")) { if (Tag.cameras.Length > 1) { Tag.cameras[1].height = int.Parse(split[1]); } }
+                else if (split[0].Equals("trackerSize")) { if (Tag.cameras.Length > 1) { Aruco.markersLength = int.Parse(split[1]); } }
             }
         }
     }

@@ -32,7 +32,7 @@ namespace TrackingSmoothing {
         static VideoCapture[] capture;
         static Dictionary ArucoDict;
         static DetectorParameters ArucoParameters;
-        static int markersLength;
+        public static int markersLength = 81;
         static Mat[] cameraMatrix;
         static Mat[] distortionMatrix;
         public static void Init() {
@@ -44,11 +44,10 @@ namespace TrackingSmoothing {
             capture[1].Set(CapProp.FrameWidth, Tag.cameras[1].width);
             capture[1].Set(CapProp.FrameHeight, Tag.cameras[1].height);
 
-            markersLength = 81;
             int markersX = 4;
-            int markersY = 3;
+            int markersY = 4;
             int markersSeparation = 30;
-            ArucoDict = new Dictionary(12, 4/*Dictionary.PredefinedDictionaryName.Dict4X4_1000*/); // bits x bits (per marker) _ number of markers in dict
+            ArucoDict = new Dictionary(16, 4/*Dictionary.PredefinedDictionaryName.Dict4X4_1000*/); // bits x bits (per marker) _ number of markers in dict
             //ArucoDict = new Dictionary(false);
             GridBoard ArucoBoard = null;
             ArucoBoard = new GridBoard(markersX, markersY, markersLength, markersSeparation, ArucoDict);
