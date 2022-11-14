@@ -1,0 +1,13 @@
+trackerDelay=300
+poseAdjust=true
+poseAdjustLegDistance=0.5
+poseAdjustWaist=waist
+oscAddress=127.0.0.1
+oscPort=39570
+camera1Quality=1.1
+camera0File=cameraParameters1.xml
+camera1File=cameraParameters2.xml
+camera0Width=800
+camera0Height=600
+camera1Width=800
+camera1Height=600

@@ -1,0 +1,25 @@
+rightfoot
+0 0.0 0.0 0.0 -0.055
+1 1.5707963268 0.0 0.0 -0.055
+2 3.1415926536 0.0 0.0 -0.055
+3 4.7123889804 0.0 0.0 -0.055
+filterSmoothRot=20
+
+leftfoot
+4 0.0 0.0 0.0 -0.055
+5 1.5707963268 0.0 0.0 -0.055
+6 3.1415926536 0.0 0.0 -0.055
+7 4.7123889804 0.0 0.0 -0.055
+filterSmoothRot=20
+
+waist
+8 0.0 0.0 0.0 -0.17
+9 0.9424777961 0.0 0.0 -0.12
+10 2.1991148575 0.0 0.0 -0.12
+11 3.1415926536 0.0 0.0 -0.17
+filterSmoothRot=150
+filterSmoothPos=25
+avgSmoothDistTrigger=0.05
+avgSmoothVal=0.04
+filterSmoothPerTrackerRot=25
+trackerFollowWeight=0.9
