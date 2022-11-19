@@ -246,6 +246,10 @@ namespace TrackingSmoothing {
                 else if (split[0].Equals("camera1Height")) { if (Tag.cameras.Length > 1) { Tag.cameras[1].height = int.Parse(split[1]); } }
                 else if (split[0].Equals("trackerSize")) { Aruco.markersLength = int.Parse(split[1]); }
                 else if (split[0].Equals("updatesPerSecond")) { updateFPS = int.Parse(split[1]); }
+                else if (split[0].Equals("useSmoothCorners")) { Aruco.useSmoothCorners = split[1].Equals("true"); }
+                else if (split[0].Equals("cornersMaxDistance")) { Aruco.cornersMaxDistance = int.Parse(split[1]); } 
+                else if (split[0].Equals("cornersSmoothFactor")) { Aruco.cornersSmoothFactor = float.Parse(split[1], any, invariantCulture); }
+
             }
         }
     }

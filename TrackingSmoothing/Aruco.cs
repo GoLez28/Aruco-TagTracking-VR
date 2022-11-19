@@ -14,6 +14,12 @@ using System.Runtime.InteropServices;
 
 namespace TrackingSmoothing {
     class Aruco {
+        class RectEx {
+            public PointF[] smoothedVals = new PointF[4];
+            public PointF[] lockedVals = new PointF[4];
+            public PointF[] prevVals = new PointF[4];
+            public bool locked;
+        }
         static void PrintArucoBoard(GridBoard ArucoBoard, int markersX = 4, int markersY = 4, int markersLength = 80, int markersSeparation = 30) {
             // Size of the border of a marker in bits
             int borderBits = 1;
@@ -28,13 +34,20 @@ namespace TrackingSmoothing {
             // Save the image
             boardImage.Save("arucoboard.png");
         }
-        //78
+        static RectEx[][] betterRects = new RectEx[][] {
+            new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() },
+            new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() } 
+        };
         static VideoCapture[] capture;
         static Dictionary ArucoDict;
         static DetectorParameters ArucoParameters;
         public static int markersLength = 81;
         static Mat[] cameraMatrix;
         static Mat[] distortionMatrix;
+
+        public static bool useSmoothCorners = true;
+        public static int cornersMaxDistance = 1;
+        public static float cornersSmoothFactor = 0.2f;
         public static void Init() {
             capture = new VideoCapture[2];
             capture[0] = new VideoCapture(1);
@@ -103,6 +116,8 @@ namespace TrackingSmoothing {
                         VectorOfVectorOfPointF rejected = new VectorOfVectorOfPointF(); // rejected contours
                         ArucoInvoke.DetectMarkers(frame, ArucoDict, corners, ids, ArucoParameters, rejected);
 
+                        //smooth corners
+                        corners = SmoothCorners(c, ids, corners);
                         // If we detected at least one marker
                         if (ids.Size > 0) {
                             //Draw detected markers
@@ -168,6 +183,52 @@ namespace TrackingSmoothing {
                 Tag.newInfoReady = true;
             }
         }
+
+        private static VectorOfVectorOfPointF SmoothCorners(int c, VectorOfInt ids, VectorOfVectorOfPointF corners) {
+            PointF[][] rects = new PointF[ids.Size][];
+            for (int i = 0; i < ids.Size; i++) {
+                rects[i] = new PointF[4];
+                int id = ids[i];
+                PointF[] prev = betterRects[c][id].prevVals;
+                PointF[] lokd = betterRects[c][id].lockedVals;
+                PointF[] curr = corners[i].ToArray();
+                int wrongs = 0;
+                for (int j = 0; j < 4; j++) {
+                    if (Math.Abs(prev[j].X - curr[j].X) > cornersMaxDistance || Math.Abs(prev[j].Y - curr[j].Y) > cornersMaxDistance)
+                        wrongs++;
+                }
+                if (wrongs == 0) {
+                    betterRects[c][id].locked = true;
+                    betterRects[c][id].lockedVals = curr;
+                } else {
+                    if (betterRects[c][id].locked) {
+                        wrongs = 0;
+                        for (int j = 0; j < 4; j++) {
+                            if (Math.Abs(lokd[j].X - curr[j].X) > cornersMaxDistance || Math.Abs(lokd[j].Y - curr[j].Y) > cornersMaxDistance)
+                                wrongs++;
+                        }
+                        if (wrongs > 3) {
+                            betterRects[c][id].locked = false;
+                        }
+                    }
+                }
+                if (betterRects[c][id].locked) {
+                    for (int j = 0; j < 4; j++) {
+                        rects[i][j] = betterRects[c][id].smoothedVals[j];
+                        rects[i][j].X += (corners[i][j].X - betterRects[c][id].smoothedVals[j].X) * cornersSmoothFactor;
+                        rects[i][j].Y += (corners[i][j].Y - betterRects[c][id].smoothedVals[j].Y) * cornersSmoothFactor;
+                    }
+                    betterRects[c][id].smoothedVals = rects[i];
+                } else {
+                    betterRects[c][id].smoothedVals = curr;
+                }
+                rects[i] = betterRects[c][id].smoothedVals;
+                betterRects[c][id].prevVals = curr;
+            }
+            corners = new(rects);
+            return corners;
+        }
+
         static int[] queueCount = new int[2];
         static int maxQueue = 30;
         static float[][] sclQueue = new float[][] { new float[maxQueue], new float[maxQueue] };

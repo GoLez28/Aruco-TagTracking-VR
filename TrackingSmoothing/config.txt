@@ -12,3 +12,6 @@ camera0Width=800
 camera0Height=600
 camera1Width=800
 camera1Height=600
+useSmoothCorners=true
+cornersMaxDistance=1
+cornersSmoothFactor=0.2
