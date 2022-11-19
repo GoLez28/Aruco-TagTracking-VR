@@ -391,7 +391,7 @@ namespace TrackingSmoothing {
                 dist = GetDistanceFromEachTracker(camera, rndMat, cameras[1].matrix);
             else if (camera == 1)
                 dist = GetDistanceFromEachTracker(camera, cameras[0].matrix, rndMat);
-            dist += GetDistanceFromZero(camera, rndMat) * 0.0f;
+            dist += GetDistanceFromZero(camera, rndMat) * 0.25f;
             if (dist < cameras[camera].minScore) {
                 cameras[camera].minScore = dist;
                 cameras[camera].matrix = rndMat;
