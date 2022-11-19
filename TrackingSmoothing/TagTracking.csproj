@@ -39,7 +39,7 @@
 
   <ItemGroup>
     <None Update="config.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
     <None Update="trackers.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

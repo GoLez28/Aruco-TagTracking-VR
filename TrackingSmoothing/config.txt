@@ -1,3 +1,4 @@
+updatesPerSecond=80
 trackerDelay=300
 poseAdjust=true
 poseAdjustLegDistance=0.5

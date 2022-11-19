@@ -81,7 +81,7 @@ namespace TrackingSmoothing {
                 }
                 bool shouldShowFrame = Program.wantToShowFrame;
                 for (int c = 0; c < 2; c++) {
-                    #region Capture a frame with webcam
+                    //Capture a frame with webcam
                     Mat frame = new Mat();
                     frame = capture[c].QueryFrame();
                     //frame *= 2f;
@@ -95,30 +95,26 @@ namespace TrackingSmoothing {
                     //} catch (Exception e) {
                     //    Console.WriteLine();
                     //}
-                    #endregion
 
                     if (!frame.IsEmpty) {
-                        #region Detect markers on last retrieved frame
+                        //Detect markers on last retrieved frame
                         VectorOfInt ids = new VectorOfInt(); // name/id of the detected markers
                         VectorOfVectorOfPointF corners = new VectorOfVectorOfPointF(); // corners of the detected marker
                         VectorOfVectorOfPointF rejected = new VectorOfVectorOfPointF(); // rejected contours
                         ArucoInvoke.DetectMarkers(frame, ArucoDict, corners, ids, ArucoParameters, rejected);
-                        #endregion
 
                         // If we detected at least one marker
                         if (ids.Size > 0) {
-                            #region Draw detected markers
+                            //Draw detected markers
                             if (shouldShowFrame)
                                 ArucoInvoke.DrawDetectedMarkers(frame, corners, ids, new MCvScalar(255, 0, 255));
-                            #endregion
 
-                            #region Estimate pose for each marker using camera calibration matrix and distortion coefficents
+                            //Estimate pose for each marker using camera calibration matrix and distortion coefficents
                             Mat rvecs = new Mat(); // rotation vector
                             Mat tvecs = new Mat(); // translation vector
                             ArucoInvoke.EstimatePoseSingleMarkers(corners, markersLength, cameraMatrix[c], distortionMatrix[c], rvecs, tvecs);
-                            #endregion
 
-                            #region Draw 3D orthogonal axis on markers using estimated pose
+                            //Draw 3D orthogonal axis on markers using estimated pose
                             for (int i = 0; i < ids.Size; i++) {
                                 //if (ids[i] != 0 && ids[i] != 4) continue;
                                 using (Mat rvecMat = rvecs.Row(i))
@@ -147,7 +143,6 @@ namespace TrackingSmoothing {
                                 }
 
                             }
-                            #endregion
                         }
                         int queueSize = queueCount[c];
                         queueCount[c] = 0;
@@ -162,13 +157,12 @@ namespace TrackingSmoothing {
                         }
                         //---------------------
 
-                        #region Display current frame plus drawings
+                        //Display current frame plus drawings
                         if (shouldShowFrame) {
                             CvInvoke.Imshow($"Image{c}", frame);
                             CvInvoke.WaitKey(1);
                         }
                         frame.Dispose();
-                        #endregion
                     }
                 }
                 Tag.newInfoReady = true;

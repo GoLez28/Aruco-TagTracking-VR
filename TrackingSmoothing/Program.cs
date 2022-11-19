@@ -34,6 +34,7 @@ namespace TrackingSmoothing {
         public static float trackerDelay = 300f;
         public static bool wantToShowFrame = false;
         public static bool wantToCloseWindows = false;
+        public static int updateFPS = 80;
 
         public static bool ovrNotFound = false;
 
@@ -125,7 +126,7 @@ namespace TrackingSmoothing {
                     Tag.AdjustPose();
                 Tag.SendTrackers();
                 //A mimir, wait for next frame (80fps)
-                System.Threading.Thread.Sleep(1000 / 80);
+                System.Threading.Thread.Sleep(1000 / updateFPS);
 
                 var mm = devPos[3].mDeviceToAbsoluteTracking;
                 frameCount++;
@@ -243,7 +244,8 @@ namespace TrackingSmoothing {
                 else if (split[0].Equals("camera1Width")) { if (Tag.cameras.Length > 1) { Tag.cameras[1].width = int.Parse(split[1]); } }
                 else if (split[0].Equals("camera0Height")) { if (Tag.cameras.Length > 0) { Tag.cameras[0].height = int.Parse(split[1]); } }
                 else if (split[0].Equals("camera1Height")) { if (Tag.cameras.Length > 1) { Tag.cameras[1].height = int.Parse(split[1]); } }
-                else if (split[0].Equals("trackerSize")) { if (Tag.cameras.Length > 1) { Aruco.markersLength = int.Parse(split[1]); } }
+                else if (split[0].Equals("trackerSize")) { Aruco.markersLength = int.Parse(split[1]); }
+                else if (split[0].Equals("updatesPerSecond")) { updateFPS = int.Parse(split[1]); }
             }
         }
     }
