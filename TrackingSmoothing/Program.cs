@@ -61,9 +61,11 @@ namespace TrackingSmoothing {
             try {
                 app = new Application(Application.ApplicationType.Background);
             } catch (Exception e) {
+                Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"Could not initialize ovr\nerror:{e}");
                 System.Threading.Thread.Sleep(1000);
                 ovrNotFound = true;
+                Console.ResetColor();
             }
 
             ReadConfig();
@@ -91,20 +93,27 @@ namespace TrackingSmoothing {
             while (true) {
                 double delta = timer.Elapsed.TotalMilliseconds - previousTime;
                 previousTime = timer.Elapsed.TotalMilliseconds;
-                //Console.WriteLine("time: " + delta);
-                //if (frameCount % 10 == 0) {
-                //    (int x, int y) = Console.GetCursorPosition();
-                //    Console.SetCursorPosition(0, 0);
-                //    for (int i = 0; i < Tag.cameraTPS.Length; i++) {
-                //        if (i != 0) Console.Write(" / ");
-                //        Console.Write($"Cam {i} TPS: {Tag.cameraTPS[i].ToString("0.00")}");
-                //    }
-                //    Console.Write($"\tApp TPS: {delta}");
-                //    for (int i = Console.CursorLeft; i < Console.WindowWidth; i++) {
-                //        Console.Write(" ");
-                //    }
-                //    Console.SetCursorPosition(x, y);
-                //}
+                if (frameCount % 10 == 0) {
+                    Console.ForegroundColor = ConsoleColor.Black;
+                    Console.BackgroundColor = ConsoleColor.Gray;
+                    (int x, int y) = Console.GetCursorPosition();
+                    Console.SetCursorPosition(0, 0);
+                    for (int i = 0; i < Tag.cameraTPS.Length; i++) {
+                        if (i != 0) Console.Write(" / ");
+                        Console.Write($"Cam {i} TPS: {Tag.cameraTPS[i]:0.00}");
+                    }
+                    int initX = Console.CursorLeft;
+                    int endX = (initX / 8 + 1) * 8;
+                    for (int i = initX; i < endX; i++) {
+                        Console.Write(" ");
+                    }
+                    Console.Write($"App TPS: {delta:0.00}");
+                    for (int i = Console.CursorLeft; i < Console.WindowWidth; i++) {
+                        Console.Write(" ");
+                    }
+                    Console.SetCursorPosition(x, y);
+                    Console.ResetColor();
+                }
                 //Check for keys
                 if (Console.KeyAvailable) {
                     ConsoleKey key = Console.ReadKey(true).Key;
@@ -163,8 +172,8 @@ namespace TrackingSmoothing {
             }
         }
         static void ShowHint() {
-            Console.WriteLine($"\nReset Trackers: O - Show Hints: Space - Adjust Offset by Hand: 2\n" +
-                $"X: 5/6 {offset.X} - Y: T/Y {offset.Y} - Z: G/H {offset.Z} - Yaw: B/N {rotationY} - Clear Console: 0 - Show Windows: 9");
+            Console.WriteLine($"\n[O] Reset Trackers\n[Space] Show Hints\n[D1] Calibrate Cameras\n[D2] Manual Offset Adjust\n[D9] Show Camera Windows\n[D0] Clear Console\n" +
+                $"[5]-[6] X: {offset.X}\n[T]-[Y] Y: {offset.Y}\n[G]-[H] Z: {offset.Z}\n[B]-[N] Yaw: {rotationY}");
         }
         static void KeyPressed(ConsoleKey key) {
             Console.WriteLine($"Pressed {key}");
@@ -222,6 +231,7 @@ namespace TrackingSmoothing {
                 if (!wantToShowFrame) wantToCloseWindows = true;
             } else if (key == ConsoleKey.D0) {
                 Console.Clear();
+                Console.WriteLine();
                 ShowHint();
             } else if (key == ConsoleKey.D2) {
                 adjustOffset = !adjustOffset;
