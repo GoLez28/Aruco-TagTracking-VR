@@ -33,6 +33,7 @@ namespace TrackingSmoothing {
         public static List<Vector4> hmdList = new List<Vector4>();
         public static float trackerDelay = 300f;
         public static bool wantToShowFrame = false;
+        public static bool adjustOffset = false;
         public static bool wantToCloseWindows = false;
         public static int updateFPS = 80;
 
@@ -44,8 +45,14 @@ namespace TrackingSmoothing {
 
         public static Stopwatch timer = new Stopwatch();
         public static Valve.VR.TrackedDevicePose_t[] devPos = new Valve.VR.TrackedDevicePose_t[4];
+        public static Valve.VR.HmdMatrix34_t prevCont = new();
         public static int frameCount = 0;
         static void Main(string[] args) {
+            /////////////////////////////////////////////////
+            ///TODO: Fix all this crap of laggy code
+            /////////////////////////////////////////////////
+
+
             Console.WriteLine("Starting...");
             timer.Start();
 
@@ -107,9 +114,32 @@ namespace TrackingSmoothing {
                 //Get OVR Device Positions
                 if (!ovrNotFound) {
                     app.OVRSystem.GetDeviceToAbsoluteTrackingPose(Valve.VR.ETrackingUniverseOrigin.TrackingUniverseRawAndUncalibrated, 0, devPos);
+
+                    if (adjustOffset) {
+                        var controller = app.OVRSystem.GetTrackedDeviceIndexForControllerRole(Valve.VR.ETrackedControllerRole.RightHand);
+                        Valve.VR.VRControllerState_t state = new();
+                        bool lol = app.OVRSystem.GetControllerState(controller, ref state, (uint)System.Runtime.InteropServices.Marshal.SizeOf(state));
+
+                        //i separate translate offset and rotate offset bc my brain just thinking about matrices
+                        var m2 = devPos[2].mDeviceToAbsoluteTracking;
+                        //Console.WriteLine($"{m2.m0:0.00},{m2.m1:0.00},{m2.m2:0.00},{m2.m3:0.00},{m2.m4:0.00},{m2.m5:0.00},{m2.m6:0.00},{m2.m7:0.00},{m2.m8:0.00},{m2.m9:0.00},{m2.m10:0.00},{m2.m11:0.00},");
+                        Matrix4x4 d = new();
+                        d.M41 = prevCont.m3 - m2.m3;
+                        d.M42 = prevCont.m7 - m2.m7;
+                        d.M43 = prevCont.m11 - m2.m11;
+                        d = Matrix4x4.Multiply(Matrix4x4.CreateFromYawPitchRoll(0, 0, rotationY), d);
+                        if (state.rAxis2.x > 0.5f) {
+                            offsetMat.M41 += -d.M41;
+                            offsetMat.M43 += -d.M42;
+                            offsetMat.M42 += d.M43;
+                        } else if (state.rAxis1.x > 0.5f) {
+                            rotationY += d.M41;
+                            ApplyOffset();
+                        }
+                        prevCont = m2;
+                    }
                 }
                 var m = devPos[0].mDeviceToAbsoluteTracking;
-                var m2 = devPos[1].mDeviceToAbsoluteTracking;
                 //Save only the HMD
                 hmdPos[0] = m.m3;
                 hmdPos[1] = m.m7;
@@ -133,7 +163,7 @@ namespace TrackingSmoothing {
             }
         }
         static void ShowHint() {
-            Console.WriteLine($"\nReset Trackers: O - Show Hints: Space\n" +
+            Console.WriteLine($"\nReset Trackers: O - Show Hints: Space - Adjust Offset by Hand: 2\n" +
                 $"X: 5/6 {offset.X} - Y: T/Y {offset.Y} - Z: G/H {offset.Z} - Yaw: B/N {rotationY} - Clear Console: 0 - Show Windows: 9");
         }
         static void KeyPressed(ConsoleKey key) {
@@ -193,6 +223,11 @@ namespace TrackingSmoothing {
             } else if (key == ConsoleKey.D0) {
                 Console.Clear();
                 ShowHint();
+            } else if (key == ConsoleKey.D2) {
+                adjustOffset = !adjustOffset;
+                Console.WriteLine($"Adjust offset by hand: " + (adjustOffset ? "Enabled" : "Disabled"));
+                if (adjustOffset)
+                    Console.WriteLine("Move offset with Grip, rotate with Trigger");
             }
             using (StreamWriter sw = new StreamWriter("offsets")) {
                 sw.WriteLine(rotationY);
