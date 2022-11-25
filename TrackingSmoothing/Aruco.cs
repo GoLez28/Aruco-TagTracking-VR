@@ -35,8 +35,8 @@ namespace TrackingSmoothing {
             boardImage.Save("arucoboard.png");
         }
         static RectEx[][] betterRects = new RectEx[][] {
-            new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() },
-            new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() } 
+            new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() },
+            new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() } 
         };
         static VideoCapture[] capture;
         static Dictionary ArucoDict;
@@ -117,12 +117,16 @@ namespace TrackingSmoothing {
                         ArucoInvoke.DetectMarkers(frame, ArucoDict, corners, ids, ArucoParameters, rejected);
 
                         //smooth corners
-                        corners = SmoothCorners(c, ids, corners);
+                        try {
+                            corners = SmoothCorners(c, ids, corners);
+                        } catch (Exception e) {
+                            Console.WriteLine("Couldnt smooth corners\n" + e);
+                        }
                         // If we detected at least one marker
                         if (ids.Size > 0) {
                             //Draw detected markers
                             if (shouldShowFrame)
-                                ArucoInvoke.DrawDetectedMarkers(frame, corners, ids, new MCvScalar(255, 0, 255));
+                                    ArucoInvoke.DrawDetectedMarkers(frame, corners, ids, new MCvScalar(255, 0, 255));
 
                             //Estimate pose for each marker using camera calibration matrix and distortion coefficents
                             Mat rvecs = new Mat(); // rotation vector
@@ -150,7 +154,7 @@ namespace TrackingSmoothing {
                                         (float)dRotMat[1], (float)dRotMat[4], (float)dRotMat[7], 0f,
                                         (float)dRotMat[2], (float)dRotMat[5], (float)dRotMat[8], 0f,
                                         0f, 0f, 0f, 1f);
-                                    if (!Tag.newInfoReady)
+                                    //if (!Tag.newInfoReady)
                                         Tag.RecieveTrackerAsync(ids[i], c, rot, pos);
                                     pos.Y -= 0.1f;
                                     Matrix4x4 finalMat = Matrix4x4.Multiply(rot, Matrix4x4.CreateTranslation(pos));

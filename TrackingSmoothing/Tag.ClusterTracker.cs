@@ -28,10 +28,10 @@ namespace TrackingSmoothing {
             public Vector3 prevPos = new Vector3();
             public string trackerName = "unknown";
 
-            public float avgSmoothDistTrigger = 0.03f; //w 0.05
+            public float avgSmoothDistTrigger = 0.025f; //w 0.05
             public float avgSmoothVal = 0.1f; //w 0.04
-            public float avgSmoothRecoverVal = 0.7f;
-            public float avgSmoothAlwaysVal = 0.02f;
+            public float avgSmoothRecoverVal = 0.9f;
+            public float avgSmoothAlwaysVal = 0.08f;
             public float smoothedRot = 5;
             public float smoothedPos = 2;
 
@@ -84,6 +84,13 @@ namespace TrackingSmoothing {
                 //    };
                 //}
 
+                //INCREMENT COUNT SINCE
+                if (newInfo) {
+                    for (int k = 0; k < updateCount.Length; k++) {
+                        updateCount[k]++;
+                    }
+                }
+
                 //PRELOAD VARIABLES
                 int cams = cameras.Length;
                 Matrix4x4[] trackersMat = new Matrix4x4[trackers.Length * cams];
@@ -111,13 +118,6 @@ namespace TrackingSmoothing {
                     trackerOffsetsMat[i + 1] = trackerOffsetsMat[i];
                 }
 
-                //INCREMENT COUNT SINCE
-                if (newInfo) {
-                    for (int k = 0; k < updateCount.Length; k++) {
-                        updateCount[k]++;
-                    }
-                }
-
                 //INITIALIZE VARIABLES
                 Vector3[] estimatedPos = new Vector3[trackers.Length * cams];
                 Quaternion[] estimatedRot = new Quaternion[trackers.Length * cams];
@@ -134,7 +134,7 @@ namespace TrackingSmoothing {
                         actualAvailableTrackers++;
                     }
                 }
-                if (lastRotCount < 10) { //add previous rotation
+                if (lastRotCount < 2) { //add previous rotation
                     posibleRots.Add(prevRot);
                     posibleRotsCount.Add(new List<Quaternion>());
                     posibleRotsCount[0].Add(prevRot);
@@ -357,7 +357,7 @@ namespace TrackingSmoothing {
                 }
                 if (maxPosPresence == minPosPresence)
                     maxPosPresence++;
-                float sumPosPresence = 1;
+                float sumPosPresence = 0;
                 for (int i = 0; i < estimatedPos.Length; i++) {
                     sumPosPresence += Utils.GetMap(trackerPresence[i], minPosPresence, maxPosPresence, 1f, 0f);
                 }
@@ -365,7 +365,7 @@ namespace TrackingSmoothing {
                 if (actualAvailableTrackers == 0) {
                     avgPosPresence = prevPos;
                 } else {
-                    avgPosPresence += prevPos * (1f / sumPosPresence);
+                    //avgPosPresence += prevPos * (1f / sumPosPresence);
                     for (int i = 0; i < estimatedPos.Length; i++) {
                         float add = Utils.GetMap(trackerPresence[i], minPosPresence, maxPosPresence, 1f / sumPosPresence, 0f);
                         avgPosPresence += poss[i] * add;

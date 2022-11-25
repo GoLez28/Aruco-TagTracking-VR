@@ -21,10 +21,11 @@ namespace TrackingSmoothing {
             public OneEuroFilter<Quaternion> smoothedRot = new OneEuroFilter<Quaternion>(5); //w 150
             public Vector3 alwaysSmoothed = new Vector3();
             public Vector3 smoothPrevPos = new Vector3();
-            public float avgSmoothDistTrigger = 0.03f; //w 0.05
-            public float avgSmoothVal = 0.1f; //w 0.04
-            public float avgSmoothRecoverVal = 0.7f;
-            public float avgSmoothAlwaysVal = 0.02f;
+            public Quaternion smoothPrevRot = new Quaternion();
+            public float avgSmoothDistTrigger = 0.025f; //w 0.05
+            public float avgSmoothVal = 0.2f; //w 0.04
+            public float avgSmoothRecoverVal = 0.9f;
+            public float avgSmoothAlwaysVal = 0.08f;
 
             public FinalTracker(Vector3 pos, Quaternion rot, Quaternion prot, string name) {
                 this.pos = pos;
@@ -38,6 +39,7 @@ namespace TrackingSmoothing {
                     frot = smoothedRot.Filter(rot);
                 if (!float.IsNaN(pos.X))
                     fpos = smoothedPos.Filter(pos);
+                //fpos = pos;
 
                 float distTh = avgSmoothDistTrigger; //0.0004f
                 float smoothiness = avgSmoothVal;
@@ -47,6 +49,14 @@ namespace TrackingSmoothing {
                 }
                 smoothPrevPos += (fpos - smoothPrevPos) * smoothiness;
                 fpos = smoothPrevPos;
+
+                float smoothinessRot = smoothiness + (1 - smoothiness) / 2; //to be less smoothed
+                smoothPrevRot.X += (frot.X - smoothPrevRot.X) * smoothinessRot;
+                smoothPrevRot.Y += (frot.Y - smoothPrevRot.Y) * smoothinessRot;
+                smoothPrevRot.Z += (frot.Z - smoothPrevRot.Z) * smoothinessRot;
+                smoothPrevRot.W += (frot.W - smoothPrevRot.W) * smoothinessRot;
+                smoothPrevRot = Quaternion.Normalize(smoothPrevRot);
+                frot = smoothPrevRot;
             }
         }
         public class RecieveTag {
@@ -463,6 +473,15 @@ namespace TrackingSmoothing {
                 finals[i].pos = pos;
                 finals[i].prot = finals[i].rot;
                 finals[i].rot = q;
+                finals[i].Update();
+                Matrix4x4 previewMat = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(finals[i].frot), Matrix4x4.CreateTranslation(finals[i].fpos));
+                Matrix4x4 inv;
+                Matrix4x4.Invert(Program.offsetMat, out inv);
+                mat = Matrix4x4.Multiply(previewMat, inv);
+                mat.M41 += (headPos.X - Program.hmdPos[0]) * trackers[i].trackerFollowWeight;
+                mat.M43 += (headPos.Y - Program.hmdPos[1]) * trackers[i].trackerFollowWeight;
+                mat.M42 -= (headPos.Z - Program.hmdPos[2]) * trackers[i].trackerFollowWeight;
+                Aruco.DrawAxis(mat);
                 //Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
                 //                            pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
                 //                            -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
@@ -486,7 +505,6 @@ namespace TrackingSmoothing {
             //}
             //newInfo = false;
             for (int i = 0; i < finals.Length; i++) {
-                finals[i].Update();
                 Vector3 pos = finals[i].fpos;
                 Quaternion q = finals[i].frot;
                 Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
@@ -496,7 +514,6 @@ namespace TrackingSmoothing {
         }
 
         public static void AdjustPose() {
-
             int waist = -1;
             for (int i = 0; i < finals.Length; i++) {
                 if (finals[i].name.Equals(Program.poseAdjustWaist)) {
@@ -564,10 +581,10 @@ namespace TrackingSmoothing {
                 }
             }
 
-            for (int i = 0; i < finals.Length; i++) {
-                Matrix4x4 mat = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(finals[i].rot), Matrix4x4.CreateTranslation(finals[i].pos));
-                Aruco.DrawAxis(mat);
-            }
+            //for (int i = 0; i < finals.Length; i++) {
+            //    Matrix4x4 mat = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(finals[i].rot), Matrix4x4.CreateTranslation(finals[i].pos));
+            //    Aruco.DrawAxis(mat);
+            //}
             //System.Threading.Thread.Sleep(50);
 
             static void GetYawPitchRoll(Quaternion q, out double yaw, out double pitch, out double roll) {
