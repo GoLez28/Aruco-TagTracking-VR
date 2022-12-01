@@ -34,6 +34,9 @@ namespace TrackingSmoothing {
         public static float trackerDelay = 300f;
         public static bool wantToShowFrame = false;
         public static bool adjustOffset = false;
+        public static bool cannotGetControllers = false;
+        public static bool isMoveKeyPressed = false;
+        public static bool isRotateKeyPressed = false;
         public static bool wantToCloseWindows = false;
         public static int updateFPS = 80;
 
@@ -128,6 +131,20 @@ namespace TrackingSmoothing {
                         var controller = app.OVRSystem.GetTrackedDeviceIndexForControllerRole(Valve.VR.ETrackedControllerRole.RightHand);
                         Valve.VR.VRControllerState_t state = new();
                         bool lol = app.OVRSystem.GetControllerState(controller, ref state, (uint)System.Runtime.InteropServices.Marshal.SizeOf(state));
+                        bool moveTrigger = state.rAxis2.x > 0.5f;
+                        bool rotateTrigger = state.rAxis1.x > 0.5f;
+
+                        //lazy fix
+                        if (!lol) {
+                            if (!cannotGetControllers) {
+                                cannotGetControllers = true;
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.WriteLine("Cannot get controller input, use [P] to move and [O] to rotate instead");
+                                Console.ResetColor();
+                            }
+                            if (isMoveKeyPressed) moveTrigger = true;
+                            if (isRotateKeyPressed) rotateTrigger = true;
+                        }
 
                         //i separate translate offset and rotate offset bc my brain just thinking about matrices
                         var m2 = devPos[2].mDeviceToAbsoluteTracking;
@@ -137,11 +154,11 @@ namespace TrackingSmoothing {
                         d.M42 = prevCont.m7 - m2.m7;
                         d.M43 = prevCont.m11 - m2.m11;
                         d = Matrix4x4.Multiply(Matrix4x4.CreateFromYawPitchRoll(0, 0, rotationY), d);
-                        if (state.rAxis2.x > 0.5f) {
+                        if (moveTrigger) {
                             offsetMat.M41 += -d.M41;
                             offsetMat.M43 += -d.M42;
                             offsetMat.M42 += d.M43;
-                        } else if (state.rAxis1.x > 0.5f) {
+                        } else if (rotateTrigger) {
                             rotationY += d.M41;
                             ApplyOffset();
                         }
@@ -172,12 +189,12 @@ namespace TrackingSmoothing {
             }
         }
         static void ShowHint() {
-            Console.WriteLine($"\n[O] Reset Trackers\n[Space] Show Hints\n[D1] Calibrate Cameras\n[D2] Manual Offset Adjust\n[D9] Show Camera Windows\n[D0] Clear Console\n" +
+            Console.WriteLine($"\n[8] Reset Trackers\n[Space] Show Hints\n[D1] Calibrate Cameras\n[D2] Manual Offset Adjust\n[D9] Show Camera Windows\n[D0] Clear Console\n" +
                 $"[5]-[6] X: {offset.X}\n[T]-[Y] Y: {offset.Y}\n[G]-[H] Z: {offset.Z}\n[B]-[N] Yaw: {rotationY}");
         }
         static void KeyPressed(ConsoleKey key) {
-            Console.WriteLine($"Pressed {key}");
-            if (key == ConsoleKey.O) {
+            Console.Write($"Pressed {key}: ");
+            if (key == ConsoleKey.D8) {
                 oscClient.Send("VMT/Reset");
                 Console.WriteLine($"Sent Reset to VMT");
             } else if (key == ConsoleKey.Spacebar) {
@@ -234,11 +251,25 @@ namespace TrackingSmoothing {
                 Console.WriteLine();
                 ShowHint();
             } else if (key == ConsoleKey.D2) {
+                cannotGetControllers = false;
                 adjustOffset = !adjustOffset;
+                isMoveKeyPressed = false;
+                isRotateKeyPressed = false;
                 Console.WriteLine($"Adjust offset by hand: " + (adjustOffset ? "Enabled" : "Disabled"));
                 if (adjustOffset)
                     Console.WriteLine("Move offset with Grip, rotate with Trigger");
+            } else if (key == ConsoleKey.P) {
+                if (cannotGetControllers) {
+                    isMoveKeyPressed = !isMoveKeyPressed;
+                    Console.WriteLine($"Move offset manually {(isMoveKeyPressed ? "Enabled" : "Disabled")}");
+                }
+            } else if (key == ConsoleKey.O) {
+                if (cannotGetControllers) {
+                    isRotateKeyPressed = !isRotateKeyPressed;
+                    Console.WriteLine($"Rotate offset manually {(isRotateKeyPressed ? "Enabled" : "Disabled")}");
+                }
             }
+            Console.WriteLine();
             using (StreamWriter sw = new StreamWriter("offsets")) {
                 sw.WriteLine(rotationY);
                 sw.WriteLine(offsetMat.M41);
