@@ -312,21 +312,20 @@ namespace TrackingSmoothing {
                 else if (split[0].Equals("poseAdjustWaist")) poseAdjustWaist = split[1];
                 else if (split[0].Equals("oscAddress")) oscAddress = split[1];
                 else if (split[0].Equals("oscPort")) oscPortOut = int.Parse(split[1]);
-                else if (split[0].Equals("camera0Quality")) { if (Tag.cameras.Length > 0) { Tag.cameras[0].quality = float.Parse(split[1], any, invariantCulture); } } //aahahahahhahahahahah
-                else if (split[0].Equals("camera1Quality")) { if (Tag.cameras.Length > 1) { Tag.cameras[1].quality = float.Parse(split[1], any, invariantCulture); } }
-                else if (split[0].Equals("camera0File")) { if (Tag.cameras.Length > 0) { Tag.cameras[0].file = split[1]; } }
-                else if (split[0].Equals("camera1File")) { if (Tag.cameras.Length > 1) { Tag.cameras[1].file = split[1]; } }
-                else if (split[0].Equals("camera0Width")) { if (Tag.cameras.Length > 0) { Tag.cameras[0].width = int.Parse(split[1]); } }
-                else if (split[0].Equals("camera1Width")) { if (Tag.cameras.Length > 1) { Tag.cameras[1].width = int.Parse(split[1]); } }
-                else if (split[0].Equals("camera0Height")) { if (Tag.cameras.Length > 0) { Tag.cameras[0].height = int.Parse(split[1]); } }
-                else if (split[0].Equals("camera1Height")) { if (Tag.cameras.Length > 1) { Tag.cameras[1].height = int.Parse(split[1]); } }
-                else if (split[0].Equals("camera0Index")) { if (Tag.cameras.Length > 0) { Tag.cameras[0].index = int.Parse(split[1]); } }
-                else if (split[0].Equals("camera1Index")) { if (Tag.cameras.Length > 1) { Tag.cameras[1].index = int.Parse(split[1]); } }
                 else if (split[0].Equals("trackerSize")) { Aruco.markersLength = int.Parse(split[1]); }
                 else if (split[0].Equals("updatesPerSecond")) { updateFPS = int.Parse(split[1]); }
                 else if (split[0].Equals("useSmoothCorners")) { Aruco.useSmoothCorners = split[1].Equals("true"); }
                 else if (split[0].Equals("cornersMaxDistance")) { Aruco.cornersMaxDistance = int.Parse(split[1]); } 
                 else if (split[0].Equals("cornersSmoothFactor")) { Aruco.cornersSmoothFactor = float.Parse(split[1], any, invariantCulture); }
+                else if (split[0].Contains("camera")) {
+                    for (int j = 0; j < 2; j++) {
+                        if (split[0].Equals($"camera{j}Quality")) { if (Tag.cameras.Length > j) { Tag.cameras[j].quality = float.Parse(split[1], any, invariantCulture); } }
+                        else if (split[0].Equals($"camera{j}File")) { if (Tag.cameras.Length > j) { Tag.cameras[j].file = split[1]; } }
+                        else if (split[0].Equals($"camera{j}Width")) { if (Tag.cameras.Length > j) { Tag.cameras[j].width = int.Parse(split[1]); } }
+                        else if (split[0].Equals($"camera{j}Height")) { if (Tag.cameras.Length > j) { Tag.cameras[j].height = int.Parse(split[1]); } }
+                        else if (split[0].Equals($"camera{j}Index")) { if (Tag.cameras.Length > j) { Tag.cameras[j].index = int.Parse(split[1]); } }
+                    }
+                }
 
             }
         }
