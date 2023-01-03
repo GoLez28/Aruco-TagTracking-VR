@@ -50,8 +50,8 @@ namespace TrackingSmoothing {
         public static float cornersSmoothFactor = 0.2f;
         public static void Init() {
             capture = new VideoCapture[2];
-            capture[0] = new VideoCapture(1);
-            capture[1] = new VideoCapture(2);
+            capture[0] = new VideoCapture(Tag.cameras[0].index);
+            capture[1] = new VideoCapture(Tag.cameras[1].index);
             capture[0].Set(CapProp.FrameWidth, Tag.cameras[0].width);
             capture[0].Set(CapProp.FrameHeight, Tag.cameras[0].height);
             capture[1].Set(CapProp.FrameWidth, Tag.cameras[1].width);

@@ -81,6 +81,7 @@ namespace TrackingSmoothing {
             public string file = "";
             public int width = 640;
             public int height = 480;
+            public int index = 0;
             public Camera(Matrix4x4 m, float q) {
                 matrix = m;
                 quality = q;
