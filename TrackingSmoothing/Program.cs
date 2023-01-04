@@ -22,6 +22,7 @@ namespace TrackingSmoothing {
         public static float poseAdjustLegDist = 0.5f;
 
         public static float[] hmdPos = new float[3];
+        public static float[] hmdRot = new float[3];
 
         public static Matrix4x4 offsetMat = Matrix4x4.Identity;
         public static Vector3 offset {
@@ -45,6 +46,8 @@ namespace TrackingSmoothing {
         public static uOscClient oscClient;
         static string oscAddress = "127.0.0.1";
         static int oscPortOut = 39570;//39570;
+        public static bool useVRChatOSCTrackers = false;
+        public static bool sendHeadTracker = true;
 
         public static Stopwatch timer = new Stopwatch();
         public static Valve.VR.TrackedDevicePose_t[] devPos = new Valve.VR.TrackedDevicePose_t[4];
@@ -52,7 +55,8 @@ namespace TrackingSmoothing {
         public static int frameCount = 0;
         static void Main(string[] args) {
             /////////////////////////////////////////////////
-            ///TODO: Fix all this crap of laggy code
+            ///TODO:    Fix all this crap of laggy code
+            ///         Add auto offset adjust
             /////////////////////////////////////////////////
 
 
@@ -167,9 +171,20 @@ namespace TrackingSmoothing {
                 }
                 var m = devPos[0].mDeviceToAbsoluteTracking;
                 //Save only the HMD
-                hmdPos[0] = m.m3;
-                hmdPos[1] = m.m7;
-                hmdPos[2] = m.m11;
+                Matrix4x4 hmdRotMat = new Matrix4x4(m.m0, m.m4, m.m8, 0, m.m1, m.m5, m.m9, 0, m.m2, m.m6, m.m10, 0, m.m3, m.m7, m.m11, 1);
+                if (useVRChatOSCTrackers || true) {
+                    Vector3 headInOffset = new Vector3(0, 0, 0.1f);
+                    hmdRotMat = Matrix4x4.Multiply(hmdRotMat, Matrix4x4.CreateTranslation(headInOffset));
+                }
+                Vector3 hmdPosV3 = hmdRotMat.Translation;
+                hmdPos[0] = hmdPosV3.X;
+                hmdPos[1] = hmdPosV3.Y;
+                hmdPos[2] = hmdPosV3.Z;
+                Vector3 hmdRotEuler = Tag.ToEulerAngles(Quaternion.CreateFromRotationMatrix(hmdRotMat));
+                hmdRot[0] = hmdRotEuler.X;
+                hmdRot[1] = hmdRotEuler.Y;
+                hmdRot[2] = hmdRotEuler.Z;
+
                 float time = timer.ElapsedMilliseconds / 1000000f;
                 trackerDelay = 300f;
                 hmdList.Add(new Vector4(m.m3, m.m7, m.m11, time));
@@ -312,6 +327,8 @@ namespace TrackingSmoothing {
                 else if (split[0].Equals("poseAdjustWaist")) poseAdjustWaist = split[1];
                 else if (split[0].Equals("oscAddress")) oscAddress = split[1];
                 else if (split[0].Equals("oscPort")) oscPortOut = int.Parse(split[1]);
+                else if (split[0].Equals("useVrchatOscTrackers")) useVRChatOSCTrackers = split[1].Equals("true");
+                else if (split[0].Equals("sendHeadTracker")) sendHeadTracker = split[1].Equals("true");
                 else if (split[0].Equals("trackerSize")) { Aruco.markersLength = int.Parse(split[1]); }
                 else if (split[0].Equals("updatesPerSecond")) { updateFPS = int.Parse(split[1]); }
                 else if (split[0].Equals("useSmoothCorners")) { Aruco.useSmoothCorners = split[1].Equals("true"); }
