@@ -36,7 +36,7 @@ namespace TrackingSmoothing {
         }
         static RectEx[][] betterRects = new RectEx[][] {
             new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() },
-            new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() } 
+            new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() }
         };
         static VideoCapture[] capture;
         static Dictionary ArucoDict;
@@ -50,8 +50,8 @@ namespace TrackingSmoothing {
         public static float cornersSmoothFactor = 0.2f;
         public static void Init() {
             capture = new VideoCapture[2];
-            capture[0] = new VideoCapture(Tag.cameras[0].index);
-            capture[1] = new VideoCapture(Tag.cameras[1].index);
+            capture[0] = new VideoCapture(Tag.cameras[0].index, VideoCapture.API.DShow);
+            capture[1] = new VideoCapture(Tag.cameras[1].index, VideoCapture.API.DShow);
             capture[0].Set(CapProp.FrameWidth, Tag.cameras[0].width);
             capture[0].Set(CapProp.FrameHeight, Tag.cameras[0].height);
             capture[1].Set(CapProp.FrameWidth, Tag.cameras[1].width);
@@ -97,6 +97,7 @@ namespace TrackingSmoothing {
                     //Capture a frame with webcam
                     Mat frame = new Mat();
                     frame = capture[c].QueryFrame();
+                    
                     //frame *= 2f;
                     //var asd = (Byte[,,])frame.GetData();
                     //try {
@@ -126,7 +127,7 @@ namespace TrackingSmoothing {
                         if (ids.Size > 0) {
                             //Draw detected markers
                             if (shouldShowFrame)
-                                    ArucoInvoke.DrawDetectedMarkers(frame, corners, ids, new MCvScalar(255, 0, 255));
+                                ArucoInvoke.DrawDetectedMarkers(frame, corners, ids, new MCvScalar(255, 0, 255));
 
                             //Estimate pose for each marker using camera calibration matrix and distortion coefficents
                             Mat rvecs = new Mat(); // rotation vector
@@ -155,10 +156,11 @@ namespace TrackingSmoothing {
                                         (float)dRotMat[2], (float)dRotMat[5], (float)dRotMat[8], 0f,
                                         0f, 0f, 0f, 1f);
                                     //if (!Tag.newInfoReady)
-                                        Tag.RecieveTrackerAsync(ids[i], c, rot, pos);
+                                    Tag.RecieveTrackerAsync(ids[i], c, rot, pos);
                                     pos.Y -= 0.1f;
                                     Matrix4x4 finalMat = Matrix4x4.Multiply(rot, Matrix4x4.CreateTranslation(pos));
-                                    //ArucoInvoke.DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rvec, tvec, markersLength);
+                                    if (Program.debugSendTrackerOSC)
+                                        ArucoInvoke.DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rvec, tvec, markersLength);
                                 }
 
                             }
@@ -169,7 +171,8 @@ namespace TrackingSmoothing {
                             if (posQueue[c][i] == null || rotQueue[c][i] == null) continue;
                             if (posQueue[c][i][2] == 0) continue;
                             try {
-                                ArucoInvoke.DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rotQueue[c][i], posQueue[c][i], markersLength * 0.5f * sclQueue[c][i]);
+                                if (!Program.debugSendTrackerOSC)
+                                    ArucoInvoke.DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rotQueue[c][i], posQueue[c][i], markersLength * 0.5f * sclQueue[c][i]);
                             } catch {
                                 Console.WriteLine("lol");
                             }

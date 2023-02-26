@@ -48,6 +48,7 @@ namespace TrackingSmoothing {
         static int oscPortOut = 39570;//39570;
         public static bool useVRChatOSCTrackers = false;
         public static bool sendHeadTracker = true;
+        public static bool debugSendTrackerOSC = false;
 
         public static Stopwatch timer = new Stopwatch();
         public static Valve.VR.TrackedDevicePose_t[] devPos = new Valve.VR.TrackedDevicePose_t[4];
@@ -204,7 +205,8 @@ namespace TrackingSmoothing {
             }
         }
         static void ShowHint() {
-            Console.WriteLine($"\n[8] Reset Trackers\n[Space] Show Hints\n[D1] Calibrate Cameras\n[D2] Manual Offset Adjust\n[D9] Show Camera Windows\n[D0] Clear Console\n" +
+            Console.WriteLine($"\n[D8] Reset Trackers (VMT)\n[Space] Show Hints\n[D1] Calibrate Cameras\n[D2] Manual Offset Adjust" +
+                $"\n[D3] Reload Offsets\n[D4]Reloaded Config / Trackers\n[D7] Send Debug Trackers\n[D9] Show Camera Windows\n[D0] Clear Console\n" +
                 $"[5]-[6] X: {offset.X}\n[T]-[Y] Y: {offset.Y}\n[G]-[H] Z: {offset.Z}\n[B]-[N] Yaw: {rotationY}");
         }
         static void KeyPressed(ConsoleKey key) {
@@ -273,6 +275,27 @@ namespace TrackingSmoothing {
                 Console.WriteLine($"Adjust offset by hand: " + (adjustOffset ? "Enabled" : "Disabled"));
                 if (adjustOffset)
                     Console.WriteLine("Move offset with Grip, rotate with Trigger");
+            } else if (key == ConsoleKey.D7) {
+                debugSendTrackerOSC = !debugSendTrackerOSC;
+                Console.WriteLine($"Send Debug Trackers: " + (debugSendTrackerOSC ? "Enabled" : "Disabled"));
+                if (debugSendTrackerOSC) {
+                    //Process.Start(@"viewer\tagTrackingViewer.exe");
+                    ProcessStartInfo processInfo = new ProcessStartInfo();
+                    processInfo.FileName = @"viewer\tagTrackingViewer.exe";
+                    processInfo.ErrorDialog = true;
+                    processInfo.UseShellExecute = false;
+                    processInfo.RedirectStandardOutput = true;
+                    processInfo.RedirectStandardError = true;
+                    processInfo.WorkingDirectory = Path.GetDirectoryName(@"viewer\tagTrackingViewer.exe");
+                    Process.Start(processInfo);
+                }
+            } else if (key == ConsoleKey.D3) {
+                LoadOffsets();
+                Console.WriteLine($"Reloaded Offsets");
+            } else if (key == ConsoleKey.D4) {
+                ReadConfig();
+                Tag.ReadTrackers();
+                Console.WriteLine($"Reloaded Config / Trackers");
             } else if (key == ConsoleKey.P) {
                 if (cannotGetControllers) {
                     isMoveKeyPressed = !isMoveKeyPressed;
@@ -284,6 +307,27 @@ namespace TrackingSmoothing {
                     Console.WriteLine($"Rotate offset manually {(isRotateKeyPressed ? "Enabled" : "Disabled")}");
                 }
             }
+            //if (debugSendTrackerOSC) {
+            //    if (key == ConsoleKey.Z) {
+            //        Matrix4x4 newRot = Matrix4x4.CreateFromYawPitchRoll(0, 0, 0.01f);
+            //        Tag.cameras[0].matrix = Matrix4x4.Multiply(Tag.cameras[0].matrix, newRot);
+            //    } else if (key == ConsoleKey.X) {
+            //        Matrix4x4 newRot = Matrix4x4.CreateFromYawPitchRoll(0, 0, -0.01f);
+            //        Tag.cameras[0].matrix = Matrix4x4.Multiply(Tag.cameras[0].matrix, newRot);
+            //    } else if (key == ConsoleKey.A) {
+            //        Matrix4x4 newRot = Matrix4x4.CreateFromYawPitchRoll(0, 0.01f, 0);
+            //        Tag.cameras[0].matrix = Matrix4x4.Multiply(Tag.cameras[0].matrix, newRot);
+            //    } else if (key == ConsoleKey.S) {
+            //        Matrix4x4 newRot = Matrix4x4.CreateFromYawPitchRoll(0, -0.01f, 0);
+            //        Tag.cameras[0].matrix = Matrix4x4.Multiply(Tag.cameras[0].matrix, newRot);
+            //    } else if (key == ConsoleKey.Q) {
+            //        Matrix4x4 newRot = Matrix4x4.CreateFromYawPitchRoll(0.01f, 0, 0);
+            //        Tag.cameras[0].matrix = Matrix4x4.Multiply(Tag.cameras[0].matrix, newRot);
+            //    } else if (key == ConsoleKey.W) {
+            //        Matrix4x4 newRot = Matrix4x4.CreateFromYawPitchRoll(-0.01f, 0, 0);
+            //        Tag.cameras[0].matrix = Matrix4x4.Multiply(Tag.cameras[0].matrix, newRot);
+            //    }
+            //}
             Console.WriteLine();
             using (StreamWriter sw = new StreamWriter("offsets")) {
                 sw.WriteLine(rotationY);
@@ -329,18 +373,27 @@ namespace TrackingSmoothing {
                 else if (split[0].Equals("oscPort")) oscPortOut = int.Parse(split[1]);
                 else if (split[0].Equals("useVrchatOscTrackers")) useVRChatOSCTrackers = split[1].Equals("true");
                 else if (split[0].Equals("sendHeadTracker")) sendHeadTracker = split[1].Equals("true");
-                else if (split[0].Equals("trackerSize")) { Aruco.markersLength = int.Parse(split[1]); }
-                else if (split[0].Equals("updatesPerSecond")) { updateFPS = int.Parse(split[1]); }
-                else if (split[0].Equals("useSmoothCorners")) { Aruco.useSmoothCorners = split[1].Equals("true"); }
-                else if (split[0].Equals("cornersMaxDistance")) { Aruco.cornersMaxDistance = int.Parse(split[1]); } 
-                else if (split[0].Equals("cornersSmoothFactor")) { Aruco.cornersSmoothFactor = float.Parse(split[1], any, invariantCulture); }
-                else if (split[0].Contains("camera")) {
+                else if (split[0].Equals("trackerSize")) { Aruco.markersLength = int.Parse(split[1]); } else if (split[0].Equals("updatesPerSecond")) { updateFPS = int.Parse(split[1]); } else if (split[0].Equals("useSmoothCorners")) { Aruco.useSmoothCorners = split[1].Equals("true"); } else if (split[0].Equals("cornersMaxDistance")) { Aruco.cornersMaxDistance = int.Parse(split[1]); } else if (split[0].Equals("cornersSmoothFactor")) { Aruco.cornersSmoothFactor = float.Parse(split[1], any, invariantCulture); } else if (split[0].Equals("refineSearch")) { Tag.refineSearch = split[1].Equals("true"); } else if (split[0].Equals("refineIterations")) { Tag.refineIterations = int.Parse(split[1]); } else if (split[0].Equals("tagsToCalibrate")) {
+                    string[] tags = split[1].Split(',');
+                    Tag.tagToCalibrate = new int[tags.Length];
+                    for (int j = 0; j < tags.Length; j++) {
+                        Tag.tagToCalibrate[j] = int.Parse(tags[j]);
+                    }
+                } else if (split[0].Equals("tagsToCalibrateWeight")) {
+                    string[] tags = split[1].Split(',');
+                    Tag.tagToCalibrateWeight = new float[tags.Length];
+                    for (int j = 0; j < tags.Length; j++) {
+                        Tag.tagToCalibrateWeight[j] = float.Parse(tags[j], any, invariantCulture); ;
+                    }
+                } else if (split[0].Equals("tagsOnFloor")) {
+                    string[] tags = split[1].Split(',');
+                    Tag.tagsOnFloor = new int[tags.Length];
+                    for (int j = 0; j < tags.Length; j++) {
+                        Tag.tagsOnFloor[j] = int.Parse(tags[j]);
+                    }
+                } else if (split[0].Contains("camera")) {
                     for (int j = 0; j < 2; j++) {
-                        if (split[0].Equals($"camera{j}Quality")) { if (Tag.cameras.Length > j) { Tag.cameras[j].quality = float.Parse(split[1], any, invariantCulture); } }
-                        else if (split[0].Equals($"camera{j}File")) { if (Tag.cameras.Length > j) { Tag.cameras[j].file = split[1]; } }
-                        else if (split[0].Equals($"camera{j}Width")) { if (Tag.cameras.Length > j) { Tag.cameras[j].width = int.Parse(split[1]); } }
-                        else if (split[0].Equals($"camera{j}Height")) { if (Tag.cameras.Length > j) { Tag.cameras[j].height = int.Parse(split[1]); } }
-                        else if (split[0].Equals($"camera{j}Index")) { if (Tag.cameras.Length > j) { Tag.cameras[j].index = int.Parse(split[1]); } }
+                        if (split[0].Equals($"camera{j}Quality")) { if (Tag.cameras.Length > j) { Tag.cameras[j].quality = float.Parse(split[1], any, invariantCulture); } } else if (split[0].Equals($"camera{j}File")) { if (Tag.cameras.Length > j) { Tag.cameras[j].file = split[1]; } } else if (split[0].Equals($"camera{j}Width")) { if (Tag.cameras.Length > j) { Tag.cameras[j].width = int.Parse(split[1]); } } else if (split[0].Equals($"camera{j}Height")) { if (Tag.cameras.Length > j) { Tag.cameras[j].height = int.Parse(split[1]); } } else if (split[0].Equals($"camera{j}Index")) { if (Tag.cameras.Length > j) { Tag.cameras[j].index = int.Parse(split[1]); } } else if (split[0].Equals($"camera{j}WorldResize")) { if (Tag.cameras.Length > j) { Tag.cameras[j].depthMult = float.Parse(split[1], any, invariantCulture); } }
                     }
                 }
 
