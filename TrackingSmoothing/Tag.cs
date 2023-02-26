@@ -686,8 +686,8 @@ namespace TrackingSmoothing {
                 //Console.WriteLine(adjmp.Translation.Y - waistMat.Translation.Y);
                 float yDist = adjmp.Translation.Y - waistMat.Translation.Y;
                 //finals[adjustables[i]].pos = adjmp.Translation;
-                //if (yDist > -legDist * 0.5f)
-                //    continue; //dont adjust
+                if (yDist > -legDist * 0.5f)
+                    continue; //dont adjust
 
                 float pi = (float)Math.PI;
                 //get rot
