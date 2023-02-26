@@ -50,8 +50,18 @@ namespace TrackingSmoothing {
         public static float cornersSmoothFactor = 0.2f;
         public static void Init() {
             capture = new VideoCapture[2];
-            capture[0] = new VideoCapture(Tag.cameras[0].index, VideoCapture.API.DShow);
-            capture[1] = new VideoCapture(Tag.cameras[1].index, VideoCapture.API.DShow);
+            try {
+                capture[0] = new VideoCapture(Tag.cameras[0].index, VideoCapture.API.DShow);
+            } catch (Exception e) {
+                Console.WriteLine($"Something went wrong opening camera {Tag.cameras[0].index}\n{e}");
+                System.Threading.Thread.Sleep(5000);
+            }
+            try {
+                capture[1] = new VideoCapture(Tag.cameras[1].index, VideoCapture.API.DShow);
+            } catch (Exception e) {
+                Console.WriteLine($"Something went wrong opening camera {Tag.cameras[1].index}\n{e}");
+                System.Threading.Thread.Sleep(5000);
+            }
             capture[0].Set(CapProp.FrameWidth, Tag.cameras[0].width);
             capture[0].Set(CapProp.FrameHeight, Tag.cameras[0].height);
             capture[1].Set(CapProp.FrameWidth, Tag.cameras[1].width);
@@ -97,7 +107,7 @@ namespace TrackingSmoothing {
                     //Capture a frame with webcam
                     Mat frame = new Mat();
                     frame = capture[c].QueryFrame();
-                    
+
                     //frame *= 2f;
                     //var asd = (Byte[,,])frame.GetData();
                     //try {
