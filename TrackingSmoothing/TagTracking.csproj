@@ -84,10 +84,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="viewer\source\tagTrackingViewer.java">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
     <None Update="viewer\source\tagTrackingViewer.pde">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
     <None Update="viewer\tagTrackingViewer.exe">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
