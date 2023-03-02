@@ -21,6 +21,10 @@ namespace TrackingSmoothing {
         public static string poseAdjustWaist = "waist";
         public static float poseAdjustLegDist = 0.5f;
 
+        public static bool preNoise = true;
+        public static bool postNoise = true;
+        public static bool ignoreNoisyRotation = false;
+
         public static float[] hmdPos = new float[3];
         public static float[] hmdRot = new float[3];
 
@@ -147,9 +151,9 @@ namespace TrackingSmoothing {
                                 Console.WriteLine("Cannot get controller input, use [P] to move and [O] to rotate instead");
                                 Console.ResetColor();
                             }
-                            if (isMoveKeyPressed) moveTrigger = true;
-                            if (isRotateKeyPressed) rotateTrigger = true;
                         }
+                        if (isMoveKeyPressed) moveTrigger = true;
+                        if (isRotateKeyPressed) rotateTrigger = true;
 
                         //i separate translate offset and rotate offset bc my brain just thinking about matrices
                         var m2 = devPos[2].mDeviceToAbsoluteTracking;
@@ -194,7 +198,7 @@ namespace TrackingSmoothing {
 
                 Tag.Update();
                 Tag.GetTrackers();
-                if (poseAdjust)
+                if (poseAdjust && postNoise)
                     Tag.AdjustPose();
                 Tag.SendTrackers();
                 //A mimir, wait for next frame (80fps)
@@ -206,7 +210,8 @@ namespace TrackingSmoothing {
         }
         static void ShowHint() {
             Console.WriteLine($"\n[D8] Reset Trackers (VMT)\n[Space] Show Hints\n[D1] Calibrate Cameras\n[D2] Manual Offset Adjust" +
-                $"\n[D3] Reload Offsets\n[D4]Reloaded Config / Trackers\n[D7] Send Debug Trackers\n[D9] Show Camera Windows\n[D0] Clear Console\n" +
+                $"\n[D3] Reload Offsets\n[D4] Reloaded Config / Trackers\n[D7] Send Debug Trackers\n[D9] Show Camera Windows\n[D0] Clear Console" +
+                $"\n[Z] Toggle Pre Pose Noise Reduction\n[X] Toggle Post Pose Noise Reduction" +
                 $"[5]-[6] X: {offset.X}\n[T]-[Y] Y: {offset.Y}\n[G]-[H] Z: {offset.Z}\n[B]-[N] Yaw: {rotationY}");
         }
         static void KeyPressed(ConsoleKey key) {
@@ -274,7 +279,7 @@ namespace TrackingSmoothing {
                 isRotateKeyPressed = false;
                 Console.WriteLine($"Adjust offset by hand: " + (adjustOffset ? "Enabled" : "Disabled"));
                 if (adjustOffset)
-                    Console.WriteLine("Move offset with Grip, rotate with Trigger");
+                    Console.WriteLine("Move offset with Grip, rotate with Trigger. Or press [P] to move and [O] to rotate instead");
             } else if (key == ConsoleKey.D7) {
                 debugSendTrackerOSC = !debugSendTrackerOSC;
                 Console.WriteLine($"Send Debug Trackers: " + (debugSendTrackerOSC ? "Enabled" : "Disabled"));
@@ -297,15 +302,21 @@ namespace TrackingSmoothing {
                 Tag.ReadTrackers();
                 Console.WriteLine($"Reloaded Config / Trackers");
             } else if (key == ConsoleKey.P) {
-                if (cannotGetControllers) {
+                if (adjustOffset) {
                     isMoveKeyPressed = !isMoveKeyPressed;
                     Console.WriteLine($"Move offset manually {(isMoveKeyPressed ? "Enabled" : "Disabled")}");
                 }
             } else if (key == ConsoleKey.O) {
-                if (cannotGetControllers) {
+                if (adjustOffset) {
                     isRotateKeyPressed = !isRotateKeyPressed;
                     Console.WriteLine($"Rotate offset manually {(isRotateKeyPressed ? "Enabled" : "Disabled")}");
                 }
+            } else if (key == ConsoleKey.Z) {
+                preNoise = !preNoise;
+                Console.WriteLine($"Toggle pre-noise reduction {(preNoise ? "Enabled" : "Disabled")}");
+            } else if (key == ConsoleKey.X) {
+                postNoise = !postNoise;
+                Console.WriteLine($"Toggle post-noise reduction {(postNoise ? "Enabled" : "Disabled")}");
             }
             //if (debugSendTrackerOSC) {
             //    if (key == ConsoleKey.Z) {
@@ -368,7 +379,13 @@ namespace TrackingSmoothing {
                 if (split[0].Equals("trackerDelay")) trackerDelay = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("poseAdjust")) poseAdjust = split[1].Equals("true");
                 else if (split[0].Equals("poseAdjustLegDistance")) poseAdjustLegDist = float.Parse(split[1], any, invariantCulture);
+                else if (split[0].Equals("poseAdjustBackwardsAngle")) Tag.backwardsAngle = float.Parse(split[1], any, invariantCulture);
+                else if (split[0].Equals("poseAdjustPanAngleRight")) Tag.panAngleR = float.Parse(split[1], any, invariantCulture);
+                else if (split[0].Equals("poseAdjustPanAngleLeft")) Tag.panAngleL = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("poseAdjustWaist")) poseAdjustWaist = split[1];
+                else if (split[0].Equals("preNoiseReduction")) preNoise = split[1].Equals("true");
+                else if (split[0].Equals("postNoiseReduction")) postNoise = split[1].Equals("true");
+                else if (split[0].Equals("enableIgnoreNoisyRotation")) ignoreNoisyRotation = split[1].Equals("true");
                 else if (split[0].Equals("oscAddress")) oscAddress = split[1];
                 else if (split[0].Equals("oscPort")) oscPortOut = int.Parse(split[1]);
                 else if (split[0].Equals("useVrchatOscTrackers")) useVRChatOSCTrackers = split[1].Equals("true");

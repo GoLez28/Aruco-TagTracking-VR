@@ -129,7 +129,8 @@ namespace TrackingSmoothing {
 
                         //smooth corners
                         try {
-                            corners = SmoothCorners(c, ids, corners);
+                            if (Program.preNoise)
+                                corners = SmoothCorners(c, ids, corners);
                         } catch (Exception e) {
                             Console.WriteLine("Couldnt smooth corners\n" + e);
                         }

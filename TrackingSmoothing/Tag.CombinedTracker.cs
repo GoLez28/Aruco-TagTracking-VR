@@ -49,7 +49,7 @@ namespace TrackingSmoothing {
                         d2List.Add(currentDepth);
                     }
                 }
-                if (d1List.Count < d2List.Count) {
+                if (d1List.Count < d2List.Count && Program.preNoise) {
                     pos.Z = d2List[0];
                 }
 
@@ -87,14 +87,14 @@ namespace TrackingSmoothing {
                     lastRot1 = curRot;
                 }
                 singles[camera].consistentRot = false;
-                if (r1List.Count < r2List.Count) {
+                if (r1List.Count < r2List.Count && Program.preNoise) {
                     rot = Matrix4x4.CreateFromQuaternion(r2List[0]);
                     if (r2List.Count > 7) singles[camera].consistentRot = true;
                 } else {
                     if (r1List.Count > 7) singles[camera].consistentRot = true;
                 }
-                if (!singles[camera].consistentRot) {
-                    //rot = singles[camera].p_rot;
+                if (!singles[camera].consistentRot && !Program.ignoreNoisyRotation) {
+                    rot = singles[camera].p_rot;
                 }
 
                 //rot = Matrix4x4.CreateFromYawPitchRoll(0, (float)Math.PI, 0);
@@ -104,15 +104,18 @@ namespace TrackingSmoothing {
                 singles[camera].pos = pos;
                 singles[camera].p_rot = singles[camera].rot;
                 singles[camera].rot = rot;
+
+                //APPLY ONE EURO FILTER TO Z
                 singles[camera].filter_pos.UpdateParams(trackerPresence[camera] + 0.01f);
                 if (trackerPresence[camera] == 0) {
                     for (int i = 0; i < 5; i++) { //to make sure is snapped
                     singles[camera].smooth_pos = singles[camera].filter_pos.Filter(pos);
                     }
                 }
-
-                    //APPLY ONE EURO FILTER TO Z
                 singles[camera].smooth_pos = singles[camera].filter_pos.Filter(pos);
+                if (!Program.preNoise)
+                    singles[camera].smooth_pos = pos;
+
                 trackerPresence[camera]++;
                 if (trackerPresence[camera] > 10) {
                     trackerPresence[camera] = 10;

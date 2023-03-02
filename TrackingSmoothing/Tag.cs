@@ -35,6 +35,12 @@ namespace TrackingSmoothing {
             }
 
             public void Update() {
+                if (!Program.postNoise) {
+                    fpos = pos;
+                    frot = rot;
+                    return;
+                }
+
                 if (!float.IsNaN(rot.X))
                     frot = smoothedRot.Filter(rot);
                 if (!float.IsNaN(pos.X))
@@ -640,6 +646,9 @@ namespace TrackingSmoothing {
             }
         }
 
+        public static float backwardsAngle = 0.6f;
+        public static float panAngleR = -0.5f;
+        public static float panAngleL = 0.5f;
         public static void AdjustPose() {
             int waist = -1;
             for (int i = 0; i < finals.Length; i++) {
@@ -678,16 +687,18 @@ namespace TrackingSmoothing {
                 //get pos
                 adjmp = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(finals[adjustables[i]].pos), waistInv);
 
-                if (Program.debugSendTrackerOSC) {
-                    Program.oscClient.Send($"/debug/adjust/position", sendCount, 0, adjmp.Translation.X, adjmp.Translation.Z, adjmp.Translation.Y);
-                    sendCount++;
-                }
 
                 //Console.WriteLine(adjmp.Translation.Y - waistMat.Translation.Y);
                 float yDist = adjmp.Translation.Y - waistMat.Translation.Y;
                 //finals[adjustables[i]].pos = adjmp.Translation;
-                if (yDist > -legDist * 0.5f)
+                if (yDist > -legDist * 0.5f) {
+                    if (Program.debugSendTrackerOSC) {
+                        sendCount += 2;
+                        Program.oscClient.Send($"/debug/adjust/position", sendCount, 0, adjmp.Translation.X, adjmp.Translation.Z, adjmp.Translation.Y);
+                        sendCount++;
+                    }
                     continue; //dont adjust
+                }
 
                 float pi = (float)Math.PI;
                 //get rot
@@ -696,7 +707,9 @@ namespace TrackingSmoothing {
 
                 //backwards rotation fix
                 Matrix4x4 mat = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(adjmr.Rotation()), Matrix4x4.CreateTranslation(adjmp.Translation));
-                mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0, legDist, 0)), mat);
+                float brfX = (float)(legDist * Math.Sin(backwardsAngle));
+                float brfY = (float)(legDist * Math.Cos(backwardsAngle));
+                mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(brfX, brfY, 0)), mat);
 
                 if (Program.debugSendTrackerOSC) {
                     Program.oscClient.Send($"/debug/adjust/position", sendCount, 1, mat.Translation.X, mat.Translation.Z, mat.Translation.Y);
@@ -706,12 +719,20 @@ namespace TrackingSmoothing {
                 //finals[1].pos = mat.Translation;
                 //finals[1].pos.X += (float)Math.Sin(lol) / 5f;
 
-                if (mat.Translation.X < -legDist / 5f)
+                if (mat.Translation.X < adjmp.Translation.X * 0.4f)
                     isIncorrect = true;
 
                 //vertical rotation fix
                 mat = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(adjmr.Rotation()), Matrix4x4.CreateTranslation(adjmp.Translation));
-                mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(legDist, 0, 0f)), mat);
+                float angleDir = 0;
+                if (finals[adjustables[i]].name.Contains("right")) {
+                    angleDir = panAngleR;
+                } else if (finals[adjustables[i]].name.Contains("left")) {
+                    angleDir = panAngleL;
+                }
+                float vrfX = (float)(legDist * Math.Sin(angleDir));
+                float vrfY = (float)(legDist * Math.Cos(angleDir));
+                mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(vrfY, 0, vrfX)), mat);
 
                 if (Program.debugSendTrackerOSC) {
                     Program.oscClient.Send($"/debug/adjust/position", sendCount, 1, mat.Translation.X, mat.Translation.Z, mat.Translation.Y);
@@ -726,6 +747,15 @@ namespace TrackingSmoothing {
                 //Console.WriteLine(isIncorrect);
                 if (isIncorrect) {
                     finals[adjustables[i]].rot = finals[adjustables[i]].prot;
+                    if (Program.debugSendTrackerOSC) {
+                        Program.oscClient.Send($"/debug/adjust/position", sendCount, 3, adjmp.Translation.X, adjmp.Translation.Z, adjmp.Translation.Y);
+                        sendCount++;
+                    }
+                } else {
+                    if (Program.debugSendTrackerOSC) {
+                        Program.oscClient.Send($"/debug/adjust/position", sendCount, 0, adjmp.Translation.X, adjmp.Translation.Z, adjmp.Translation.Y);
+                        sendCount++;
+                    }
                 }
             }
 
