@@ -23,7 +23,7 @@ namespace TrackingSmoothing {
 
         public static bool preNoise = true;
         public static bool postNoise = true;
-        public static bool ignoreNoisyRotation = false;
+        public static bool ignoreNoisyRotation = true;
 
         public static float[] hmdPos = new float[3];
         public static float[] hmdRot = new float[3];
