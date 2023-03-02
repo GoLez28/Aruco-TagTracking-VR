@@ -109,7 +109,10 @@ namespace TrackingSmoothing {
                     Console.ForegroundColor = ConsoleColor.Black;
                     Console.BackgroundColor = ConsoleColor.Gray;
                     (int x, int y) = Console.GetCursorPosition();
-                    Console.SetCursorPosition(0, 0);
+                    int ch = Console.WindowHeight;
+                    int ypos = (y + 1) - ch;
+                    if (ypos < 0) ypos = 0;
+                    Console.SetCursorPosition(0, ypos);
                     for (int i = 0; i < Tag.cameraTPS.Length; i++) {
                         if (i != 0) Console.Write(" / ");
                         Console.Write($"Cam {i} TPS: {Tag.cameraTPS[i]:0.00}");
@@ -209,10 +212,10 @@ namespace TrackingSmoothing {
             }
         }
         static void ShowHint() {
-            Console.WriteLine($"\n[D8] Reset Trackers (VMT)\n[Space] Show Hints\n[D1] Calibrate Cameras\n[D2] Manual Offset Adjust" +
-                $"\n[D3] Reload Offsets\n[D4] Reloaded Config / Trackers\n[D7] Send Debug Trackers\n[D9] Show Camera Windows\n[D0] Clear Console" +
-                $"\n[Z] Toggle Pre Pose Noise Reduction\n[X] Toggle Post Pose Noise Reduction" +
-                $"[5]-[6] X: {offset.X}\n[T]-[Y] Y: {offset.Y}\n[G]-[H] Z: {offset.Z}\n[B]-[N] Yaw: {rotationY}");
+            Console.WriteLine($"\n[D8] Reset Trackers (VMT)\n[Space] Show Hints\n[D1] Calibrate Cameras\n[D2] Manual Offset Adjust: {Show(adjustOffset)}" +
+                $"\n[D3] Reload Offsets\n[D4] Reloaded Config/Trackers\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}\n[D9] Show Camera Windows\n[D0] Clear Console" +
+                $"\n[Z] Pre-Pose Noise Reduction: {Show(preNoise)}\n[X] Post-Pose Noise Reduction: {Show(postNoise)}" +
+                $"\n[5]-[6] X: {offset.X}\n[T]-[Y] Y: {offset.Y}\n[G]-[H] Z: {offset.Z}\n[B]-[N] Yaw: {rotationY}");
         }
         static void KeyPressed(ConsoleKey key) {
             Console.Write($"Pressed {key}: ");
@@ -277,12 +280,12 @@ namespace TrackingSmoothing {
                 adjustOffset = !adjustOffset;
                 isMoveKeyPressed = false;
                 isRotateKeyPressed = false;
-                Console.WriteLine($"Adjust offset by hand: " + (adjustOffset ? "Enabled" : "Disabled"));
+                Console.WriteLine($"Adjust offset by hand: " + Show(adjustOffset));
                 if (adjustOffset)
                     Console.WriteLine("Move offset with Grip, rotate with Trigger. Or press [P] to move and [O] to rotate instead");
             } else if (key == ConsoleKey.D7) {
                 debugSendTrackerOSC = !debugSendTrackerOSC;
-                Console.WriteLine($"Send Debug Trackers: " + (debugSendTrackerOSC ? "Enabled" : "Disabled"));
+                Console.WriteLine($"Send Debug Trackers: " + Show(debugSendTrackerOSC));
                 if (debugSendTrackerOSC) {
                     //Process.Start(@"viewer\tagTrackingViewer.exe");
                     ProcessStartInfo processInfo = new ProcessStartInfo();
@@ -304,19 +307,19 @@ namespace TrackingSmoothing {
             } else if (key == ConsoleKey.P) {
                 if (adjustOffset) {
                     isMoveKeyPressed = !isMoveKeyPressed;
-                    Console.WriteLine($"Move offset manually {(isMoveKeyPressed ? "Enabled" : "Disabled")}");
+                    Console.WriteLine($"Move offset manually {Show(isMoveKeyPressed)}");
                 }
             } else if (key == ConsoleKey.O) {
                 if (adjustOffset) {
                     isRotateKeyPressed = !isRotateKeyPressed;
-                    Console.WriteLine($"Rotate offset manually {(isRotateKeyPressed ? "Enabled" : "Disabled")}");
+                    Console.WriteLine($"Rotate offset manually {Show(isRotateKeyPressed)}");
                 }
             } else if (key == ConsoleKey.Z) {
                 preNoise = !preNoise;
-                Console.WriteLine($"Toggle pre-noise reduction {(preNoise ? "Enabled" : "Disabled")}");
+                Console.WriteLine($"Toggle pre-pose noise reduction {Show(preNoise)}");
             } else if (key == ConsoleKey.X) {
                 postNoise = !postNoise;
-                Console.WriteLine($"Toggle post-noise reduction {(postNoise ? "Enabled" : "Disabled")}");
+                Console.WriteLine($"Toggle post-pose noise reduction {Show(postNoise)}");
             }
             //if (debugSendTrackerOSC) {
             //    if (key == ConsoleKey.Z) {
@@ -346,6 +349,10 @@ namespace TrackingSmoothing {
                 sw.WriteLine(offsetMat.M42);
                 sw.WriteLine(offsetMat.M43);
             }
+        }
+
+        private static string Show(bool b) {
+            return b ? "Enabled" : "Disabled";
         }
 
         private static void ApplyOffset() {
