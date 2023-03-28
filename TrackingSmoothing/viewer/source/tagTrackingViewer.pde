@@ -105,9 +105,11 @@ void draw() {
       if (t.tick > 2) continue;
       fill(255, 255, 255);
       if (t.type == 2)
-        fill(255, 0, 0);
+        fill(0, 255, 0);
       else if (t.type == 1)
         fill(100, 255, 100, 100);
+      else if (t.type == 3)
+        fill(255, 0, 0);
       pushMatrix();
       translate(t.pos.x*100, t.pos.y*100, t.pos.z*100);
       box(10);
@@ -185,8 +187,8 @@ void oscEvent(OscMessage theOscMessage) {
   } else if (theOscMessage.addrPattern().equals("/VMT/Room/Unity")) {
     int i = theOscMessage.get(0).intValue() - 1;
     float x = theOscMessage.get(3).floatValue();
-    float y = theOscMessage.get(4).floatValue();
-    float z = theOscMessage.get(5).floatValue();
+    float y = theOscMessage.get(5).floatValue();
+    float z = theOscMessage.get(4).floatValue();
     finalt[i] = new Tracker(new PVector(-x, y, z));
   }
 }
