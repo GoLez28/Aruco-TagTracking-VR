@@ -22,7 +22,7 @@ namespace TrackingSmoothing {
         public static float poseAdjustLegDist = 0.5f;
 
         public static bool preNoise = true;
-        public static bool postNoise = true;
+        public static int postNoise = 1;
         public static bool ignoreNoisyRotation = true;
 
         public static float[] hmdPos = new float[3];
@@ -34,7 +34,9 @@ namespace TrackingSmoothing {
                 return offsetMat.Translation;
             }
         }
+        public static float rotationX = 0;
         public static float rotationY = 0;
+        public static float rotationZ = 0;
         public static List<Vector4> hmdList = new List<Vector4>();
         public static float trackerDelay = 300f;
         public static bool wantToShowFrame = false;
@@ -165,7 +167,7 @@ namespace TrackingSmoothing {
                         d.M41 = prevCont.m3 - m2.m3;
                         d.M42 = prevCont.m7 - m2.m7;
                         d.M43 = prevCont.m11 - m2.m11;
-                        d = Matrix4x4.Multiply(Matrix4x4.CreateFromYawPitchRoll(0, 0, rotationY), d);
+                        d = Matrix4x4.Multiply(Matrix4x4.CreateFromYawPitchRoll(rotationZ, rotationX, rotationY), d);
                         if (moveTrigger) {
                             offsetMat.M41 += -d.M41;
                             offsetMat.M43 += -d.M42;
@@ -201,8 +203,6 @@ namespace TrackingSmoothing {
 
                 Tag.Update();
                 Tag.GetTrackers();
-                if (poseAdjust && postNoise)
-                    Tag.AdjustPose();
                 Tag.SendTrackers();
                 //A mimir, wait for next frame (80fps)
                 System.Threading.Thread.Sleep(1000 / updateFPS);
@@ -214,8 +214,13 @@ namespace TrackingSmoothing {
         static void ShowHint() {
             Console.WriteLine($"\n[D8] Reset Trackers (VMT)\n[Space] Show Hints\n[D1] Calibrate Cameras\n[D2] Manual Offset Adjust: {Show(adjustOffset)}" +
                 $"\n[D3] Reload Offsets\n[D4] Reloaded Config/Trackers\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}\n[D9] Show Camera Windows\n[D0] Clear Console" +
-                $"\n[Z] Pre-Pose Noise Reduction: {Show(preNoise)}\n[X] Post-Pose Noise Reduction: {Show(postNoise)}" +
-                $"\n[5]-[6] X: {offset.X}\n[T]-[Y] Y: {offset.Y}\n[G]-[H] Z: {offset.Z}\n[B]-[N] Yaw: {rotationY}");
+                $"\n[M] Pre-Pose Noise Reduction: {Show(preNoise)}\n[N] Post-Pose Noise Reduction: {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}" +
+                $"\n[Q]-[W] X: {offset.X}\n[A]-[S] Y: {offset.Y}\n[Z]-[X] Z: {offset.Z}\n[E]-[R] Yaw: {rotationY}\n[D]-[F] xRot: {rotationX}\n[C]-[V] zRot: {rotationZ}");
+            if (ovrNotFound) {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"OVR not initialized, Restart app");
+                Console.ResetColor();
+            }
         }
         static void KeyPressed(ConsoleKey key) {
             Console.Write($"Pressed {key}: ");
@@ -242,31 +247,47 @@ namespace TrackingSmoothing {
                     Tag.saveMatTime = timer.ElapsedMilliseconds;
                     Console.WriteLine("Averaging...");
                 }
-            } else if (key == ConsoleKey.D5) {
+            } else if (key == ConsoleKey.Q) {
                 offsetMat.M41 -= 0.01f;
                 Console.WriteLine($"Decreased X offset {offsetMat.M41}");
-            } else if (key == ConsoleKey.D6) {
+            } else if (key == ConsoleKey.W) {
                 offsetMat.M41 += 0.01f;
                 Console.WriteLine($"Increased X offset {offsetMat.M41}");
-            } else if (key == ConsoleKey.T) {
+            } else if (key == ConsoleKey.A) {
                 offsetMat.M43 -= 0.01f;
                 Console.WriteLine($"Decreased Y offset {offsetMat.M43}");
-            } else if (key == ConsoleKey.Y) {
+            } else if (key == ConsoleKey.S) {
                 offsetMat.M43 += 0.01f;
                 Console.WriteLine($"Increased Y offset {offsetMat.M43}");
-            } else if (key == ConsoleKey.G) {
+            } else if (key == ConsoleKey.Z) {
                 offsetMat.M42 -= 0.01f;
                 Console.WriteLine($"Decreased Z offset {offsetMat.M42}");
-            } else if (key == ConsoleKey.H) {
+            } else if (key == ConsoleKey.X) {
                 offsetMat.M42 += 0.01f;
                 Console.WriteLine($"Increased Z offset {offsetMat.M42}");
-            } else if (key == ConsoleKey.B) {
+            } else if (key == ConsoleKey.E) {
                 rotationY -= 0.01f;
                 Console.WriteLine($"Decreased Yaw offset {rotationY}");
                 ApplyOffset();
-            } else if (key == ConsoleKey.N) {
+            } else if (key == ConsoleKey.R) {
                 rotationY += 0.01f;
                 Console.WriteLine($"Increased Yaw offset {rotationY}");
+                ApplyOffset();
+            } else if (key == ConsoleKey.D) {
+                rotationX -= 0.01f;
+                Console.WriteLine($"Decreased xRot offset {rotationX}");
+                ApplyOffset();
+            } else if (key == ConsoleKey.F) {
+                rotationX += 0.01f;
+                Console.WriteLine($"Increased xRot offset {rotationX}");
+                ApplyOffset();
+            } else if (key == ConsoleKey.C) {
+                rotationZ -= 0.01f;
+                Console.WriteLine($"Decreased zRot offset {rotationZ}");
+                ApplyOffset();
+            } else if (key == ConsoleKey.V) {
+                rotationZ += 0.01f;
+                Console.WriteLine($"Increased zRot offset {rotationZ}");
                 ApplyOffset();
             } else if (key == ConsoleKey.D9) {
                 wantToShowFrame = !wantToShowFrame;
@@ -314,12 +335,14 @@ namespace TrackingSmoothing {
                     isRotateKeyPressed = !isRotateKeyPressed;
                     Console.WriteLine($"Rotate offset manually {Show(isRotateKeyPressed)}");
                 }
-            } else if (key == ConsoleKey.Z) {
+            } else if (key == ConsoleKey.M) {
                 preNoise = !preNoise;
                 Console.WriteLine($"Toggle pre-pose noise reduction {Show(preNoise)}");
-            } else if (key == ConsoleKey.X) {
-                postNoise = !postNoise;
-                Console.WriteLine($"Toggle post-pose noise reduction {Show(postNoise)}");
+            } else if (key == ConsoleKey.N) {
+                postNoise++;
+                if (postNoise > 2) postNoise = 0;
+                Tag.SetFinalTrackers(postNoise == 2);
+                Console.WriteLine($"Toggle post-pose noise reduction {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}");
             }
             //if (debugSendTrackerOSC) {
             //    if (key == ConsoleKey.Z) {
@@ -344,7 +367,9 @@ namespace TrackingSmoothing {
             //}
             Console.WriteLine();
             using (StreamWriter sw = new StreamWriter("offsets")) {
+                sw.WriteLine(rotationX);
                 sw.WriteLine(rotationY);
+                sw.WriteLine(rotationZ);
                 sw.WriteLine(offsetMat.M41);
                 sw.WriteLine(offsetMat.M42);
                 sw.WriteLine(offsetMat.M43);
@@ -356,7 +381,7 @@ namespace TrackingSmoothing {
         }
 
         private static void ApplyOffset() {
-            Matrix4x4 newMat = Matrix4x4.CreateFromYawPitchRoll(0, 0, rotationY);
+            Matrix4x4 newMat = Matrix4x4.CreateFromYawPitchRoll(rotationZ, rotationX, rotationY);
             newMat.M41 = offsetMat.M41;
             newMat.M42 = offsetMat.M42;
             newMat.M43 = offsetMat.M43;
@@ -368,8 +393,10 @@ namespace TrackingSmoothing {
             if (File.Exists("offsets")) {
                 string[] lines = File.ReadAllLines("offsets");
                 int l = 0;
+                rotationX = float.Parse(lines[l++]);
                 rotationY = float.Parse(lines[l++]);
-                Matrix4x4 newMat = Matrix4x4.CreateFromYawPitchRoll(0, 0, rotationY);
+                rotationZ = float.Parse(lines[l++]);
+                Matrix4x4 newMat = Matrix4x4.CreateFromYawPitchRoll(rotationZ, rotationX, rotationY);
                 newMat.M41 = float.Parse(lines[l++]);
                 newMat.M42 = float.Parse(lines[l++]);
                 newMat.M43 = float.Parse(lines[l++]);
@@ -391,7 +418,7 @@ namespace TrackingSmoothing {
                 else if (split[0].Equals("poseAdjustPanAngleLeft")) Tag.panAngleL = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("poseAdjustWaist")) poseAdjustWaist = split[1];
                 else if (split[0].Equals("preNoiseReduction")) preNoise = split[1].Equals("true");
-                else if (split[0].Equals("postNoiseReduction")) postNoise = split[1].Equals("true");
+                else if (split[0].Equals("postNoiseReduction")) postNoise = int.Parse(split[1]);
                 else if (split[0].Equals("enableIgnoreNoisyRotation")) ignoreNoisyRotation = split[1].Equals("true");
                 else if (split[0].Equals("oscAddress")) oscAddress = split[1];
                 else if (split[0].Equals("oscPort")) oscPortOut = int.Parse(split[1]);

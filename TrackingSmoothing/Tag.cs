@@ -35,12 +35,11 @@ namespace TrackingSmoothing {
             }
 
             public void Update() {
-                if (!Program.postNoise) {
+                if (Program.postNoise == 0) {
                     fpos = pos;
                     frot = rot;
                     return;
                 }
-
                 if (!float.IsNaN(rot.X))
                     frot = smoothedRot.Filter(rot);
                 if (!float.IsNaN(pos.X))
@@ -274,15 +273,20 @@ namespace TrackingSmoothing {
                 trackerss.Add(currentTracker);
             }
             trackers = trackerss.ToArray();
+            SetFinalTrackers(Program.postNoise == 2);
+        }
+        public static void SetFinalTrackers(bool quarter) {
             finals = new FinalTracker[trackers.Length];
+            float mult = 1f;
+            if (quarter) mult = 0.25f;
             for (int j = 0; j < trackers.Length; j++) {
                 finals[j] = new(new(), new(), new(), trackers[j].trackerName);
-                finals[j].avgSmoothAlwaysVal = trackers[j].avgSmoothAlwaysVal;
-                finals[j].avgSmoothVal = trackers[j].avgSmoothVal;
-                finals[j].avgSmoothDistTrigger = trackers[j].avgSmoothDistTrigger;
-                finals[j].avgSmoothRecoverVal = trackers[j].avgSmoothRecoverVal;
-                finals[j].smoothedRot.UpdateParams(trackers[j].smoothedRot);
-                finals[j].smoothedPos.UpdateParams(trackers[j].smoothedPos);
+                finals[j].avgSmoothAlwaysVal = (float)Math.Pow(trackers[j].avgSmoothAlwaysVal, mult);
+                finals[j].avgSmoothVal = (float)Math.Pow(trackers[j].avgSmoothVal, mult);
+                finals[j].avgSmoothRecoverVal = (float)Math.Pow(trackers[j].avgSmoothRecoverVal, mult);
+                finals[j].avgSmoothDistTrigger = trackers[j].avgSmoothDistTrigger * mult;
+                finals[j].smoothedRot.UpdateParams(trackers[j].smoothedRot * mult);
+                finals[j].smoothedPos.UpdateParams(trackers[j].smoothedPos * mult);
             }
         }
         public static List<RecieveTag> tagsList = new List<RecieveTag>();
@@ -579,25 +583,27 @@ namespace TrackingSmoothing {
 
         public static void GetTrackers() {
             if (finals == null) return;
+            Vector4 headPos = Program.hmdList[0];
             for (int i = 0; i < trackers.Length; i++) {
                 Matrix4x4 mat = trackers[i].Obtain();
-                Vector4 headPos = Program.hmdList[0];
                 mat = Matrix4x4.Multiply(mat, Program.offsetMat);
                 mat.M41 -= (headPos.X - Program.hmdPos[0]) * trackers[i].trackerFollowWeight;
                 mat.M43 -= (headPos.Y - Program.hmdPos[1]) * trackers[i].trackerFollowWeight;
                 mat.M42 += (headPos.Z - Program.hmdPos[2]) * trackers[i].trackerFollowWeight;
                 Vector3 pos = mat.Translation;
                 Quaternion q = mat.Rotation();
-                Quaternion pq = trackers[i].prevRotFinal;
-                string name = trackers[i].trackerName;
                 finals[i].pos = pos;
                 finals[i].prot = finals[i].rot;
                 finals[i].rot = q;
+            }
+            if (Program.poseAdjust && Program.postNoise != 0)
+                AdjustPose();
+            for (int i = 0; i < trackers.Length; i++) {
                 finals[i].Update();
                 Matrix4x4 previewMat = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(finals[i].frot), Matrix4x4.CreateTranslation(finals[i].fpos));
                 Matrix4x4 inv;
                 Matrix4x4.Invert(Program.offsetMat, out inv);
-                mat = Matrix4x4.Multiply(previewMat, inv);
+                Matrix4x4 mat = Matrix4x4.Multiply(previewMat, inv);
                 mat.M41 += (headPos.X - Program.hmdPos[0]) * trackers[i].trackerFollowWeight;
                 mat.M43 += (headPos.Y - Program.hmdPos[1]) * trackers[i].trackerFollowWeight;
                 mat.M42 -= (headPos.Z - Program.hmdPos[2]) * trackers[i].trackerFollowWeight;
@@ -647,8 +653,8 @@ namespace TrackingSmoothing {
         }
 
         public static float backwardsAngle = 0.6f;
-        public static float panAngleR = -0.5f;
-        public static float panAngleL = 0.5f;
+        public static float panAngleR = 0.5f;
+        public static float panAngleL = -0.5f;
         public static void AdjustPose() {
             int waist = -1;
             for (int i = 0; i < finals.Length; i++) {
