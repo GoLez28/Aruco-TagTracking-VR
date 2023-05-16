@@ -350,8 +350,8 @@ namespace TrackingSmoothing {
                     for (int i = 0; i < trackerIndex.Length; i++) {
                         if (updateCount[i * 2] > 3) continue;
                         int id = trackerIndex[i];
-                        Program.oscClient.Send($"/debug/predicted/position", id, 0, poss[i * 2].X, poss[i * 2].Z, poss[i * 2].Y);
-                        Program.oscClient.Send($"/debug/predicted/position", id, 1, estimatedPos[i * 2].X, estimatedPos[i * 2].Z, estimatedPos[i * 2].Y);
+                        Program.oscClientDebug.Send($"/debug/predicted/position", id, 0, poss[i * 2].X, poss[i * 2].Z, poss[i * 2].Y);
+                        Program.oscClientDebug.Send($"/debug/predicted/position", id, 1, estimatedPos[i * 2].X, estimatedPos[i * 2].Z, estimatedPos[i * 2].Y);
                     }
                 }
                 //GET WHEN WAS LAST TIME WEIGHTS

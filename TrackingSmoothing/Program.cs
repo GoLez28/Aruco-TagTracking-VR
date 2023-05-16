@@ -50,8 +50,10 @@ namespace TrackingSmoothing {
         public static bool ovrNotFound = false;
 
         public static uOscClient oscClient;
+        public static uOscClient oscClientDebug;
         static string oscAddress = "127.0.0.1";
         static int oscPortOut = 39570;//39570;
+        static int oscPortOutDebug = 15460;//15460
         public static bool useVRChatOSCTrackers = false;
         public static bool sendHeadTracker = true;
         public static bool debugSendTrackerOSC = false;
@@ -89,6 +91,9 @@ namespace TrackingSmoothing {
             oscClient.port = oscPortOut;
             oscClient.address = oscAddress;
             oscClient.StartClient();
+            oscClientDebug = new uOscClient();
+            oscClientDebug.port = oscPortOutDebug;
+            oscClientDebug.address = oscAddress;
 
             Aruco.Init();
             Console.Clear();
@@ -204,6 +209,17 @@ namespace TrackingSmoothing {
                 Tag.Update();
                 Tag.GetTrackers();
                 Tag.SendTrackers();
+                if (debugSendTrackerOSC) {
+                    oscClientDebug.Send("/debug/final/position", 10,
+                                               hmdPosV3.X, hmdPosV3.Y, -hmdPosV3.Z, //1f, 1.7f, 1f
+                                               0, 0, 0, 1);
+                    Matrix4x4 mat = hmdRotMat;
+                    mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), mat);
+                    Vector3 matT = mat.Translation;
+                    oscClientDebug.Send("/debug/final/position", 9,
+                                               matT.X, matT.Y, -matT.Z, //1f, 1.7f, 1f
+                                               0, 0, 0, 1);
+                }
                 //A mimir, wait for next frame (80fps)
                 System.Threading.Thread.Sleep(1000 / updateFPS);
 
@@ -308,15 +324,22 @@ namespace TrackingSmoothing {
                 debugSendTrackerOSC = !debugSendTrackerOSC;
                 Console.WriteLine($"Send Debug Trackers: " + Show(debugSendTrackerOSC));
                 if (debugSendTrackerOSC) {
+                    if (!oscClientDebug.isRunning) {
+                        oscClientDebug.StartClient();
+                    }
                     //Process.Start(@"viewer\tagTrackingViewer.exe");
-                    ProcessStartInfo processInfo = new ProcessStartInfo();
-                    processInfo.FileName = @"viewer\tagTrackingViewer.exe";
-                    processInfo.ErrorDialog = true;
-                    processInfo.UseShellExecute = false;
-                    processInfo.RedirectStandardOutput = true;
-                    processInfo.RedirectStandardError = true;
-                    processInfo.WorkingDirectory = Path.GetDirectoryName(@"viewer\tagTrackingViewer.exe");
-                    Process.Start(processInfo);
+                    //ProcessStartInfo processInfo = new ProcessStartInfo();
+                    //processInfo.FileName = @"viewer\tagTrackingViewer.exe";
+                    //processInfo.ErrorDialog = true;
+                    //processInfo.UseShellExecute = false;
+                    //processInfo.RedirectStandardOutput = true;
+                    //processInfo.RedirectStandardError = true;
+                    //processInfo.WorkingDirectory = Path.GetDirectoryName(@"viewer\tagTrackingViewer.exe");
+                    //Process.Start(processInfo);
+                } else {
+                    if (oscClientDebug.isRunning) {
+                        oscClientDebug.StopClient();
+                    }
                 }
             } else if (key == ConsoleKey.D3) {
                 LoadOffsets();

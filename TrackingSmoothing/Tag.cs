@@ -315,8 +315,8 @@ namespace TrackingSmoothing {
                 CombinedTracker tracker = combinedTrackers[i];
                 int id = tracker.index;
                 Matrix4x4[] poss = tracker.Obtain();
-                Program.oscClient.Send($"/debug/trackers/position", id, 0, poss[0].Translation.X, poss[0].Translation.Z, poss[0].Translation.Y);
-                Program.oscClient.Send($"/debug/trackers/position", id, 1, poss[1].Translation.X, poss[1].Translation.Z, poss[1].Translation.Y);
+                Program.oscClientDebug.Send($"/debug/trackers/position", id, 0, poss[0].Translation.X, poss[0].Translation.Z, poss[0].Translation.Y);
+                Program.oscClientDebug.Send($"/debug/trackers/position", id, 1, poss[1].Translation.X, poss[1].Translation.Z, poss[1].Translation.Y);
             }
         }
 
@@ -641,6 +641,11 @@ namespace TrackingSmoothing {
                     Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
                                                 pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
                                                 -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
+                    if (Program.debugSendTrackerOSC) {
+                        Program.oscClientDebug.Send("/debug/final/position", i + 1,
+                                               pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
+                                               -q.X, -q.Z, -q.Y, q.W);
+                    }
                 }
             }
             //i didnt implement vrcosc correctly bc it doesnt use the rotation and idk why
@@ -679,7 +684,7 @@ namespace TrackingSmoothing {
             waistMat = Matrix4x4.Multiply(waistMat, waistInv);
             int sendCount = 0;
             if (Program.debugSendTrackerOSC) {
-                Program.oscClient.Send($"/debug/adjust/position", sendCount, 2, waistMat.Translation.X, waistMat.Translation.Z, waistMat.Translation.Y);
+                Program.oscClientDebug.Send($"/debug/adjust/position", sendCount, 2, waistMat.Translation.X, waistMat.Translation.Z, waistMat.Translation.Y);
                 sendCount++;
             }
             //finals[waist].pos = waistMat.Translation;
@@ -700,7 +705,7 @@ namespace TrackingSmoothing {
                 if (yDist > -legDist * 0.5f) {
                     if (Program.debugSendTrackerOSC) {
                         sendCount += 2;
-                        Program.oscClient.Send($"/debug/adjust/position", sendCount, 0, adjmp.Translation.X, adjmp.Translation.Z, adjmp.Translation.Y);
+                        Program.oscClientDebug.Send($"/debug/adjust/position", sendCount, 0, adjmp.Translation.X, adjmp.Translation.Z, adjmp.Translation.Y);
                         sendCount++;
                     }
                     continue; //dont adjust
@@ -718,7 +723,7 @@ namespace TrackingSmoothing {
                 mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(brfX, brfY, 0)), mat);
 
                 if (Program.debugSendTrackerOSC) {
-                    Program.oscClient.Send($"/debug/adjust/position", sendCount, 1, mat.Translation.X, mat.Translation.Z, mat.Translation.Y);
+                    Program.oscClientDebug.Send($"/debug/adjust/position", sendCount, 1, mat.Translation.X, mat.Translation.Z, mat.Translation.Y);
                     sendCount++;
                 }
 
@@ -741,7 +746,7 @@ namespace TrackingSmoothing {
                 mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(vrfY, 0, vrfX)), mat);
 
                 if (Program.debugSendTrackerOSC) {
-                    Program.oscClient.Send($"/debug/adjust/position", sendCount, 1, mat.Translation.X, mat.Translation.Z, mat.Translation.Y);
+                    Program.oscClientDebug.Send($"/debug/adjust/position", sendCount, 1, mat.Translation.X, mat.Translation.Z, mat.Translation.Y);
                     sendCount++;
                 }
 
@@ -754,12 +759,12 @@ namespace TrackingSmoothing {
                 if (isIncorrect) {
                     finals[adjustables[i]].rot = finals[adjustables[i]].prot;
                     if (Program.debugSendTrackerOSC) {
-                        Program.oscClient.Send($"/debug/adjust/position", sendCount, 3, adjmp.Translation.X, adjmp.Translation.Z, adjmp.Translation.Y);
+                        Program.oscClientDebug.Send($"/debug/adjust/position", sendCount, 3, adjmp.Translation.X, adjmp.Translation.Z, adjmp.Translation.Y);
                         sendCount++;
                     }
                 } else {
                     if (Program.debugSendTrackerOSC) {
-                        Program.oscClient.Send($"/debug/adjust/position", sendCount, 0, adjmp.Translation.X, adjmp.Translation.Z, adjmp.Translation.Y);
+                        Program.oscClientDebug.Send($"/debug/adjust/position", sendCount, 0, adjmp.Translation.X, adjmp.Translation.Z, adjmp.Translation.Y);
                         sendCount++;
                     }
                 }
