@@ -36,36 +36,63 @@ namespace TrackingSmoothing {
         }
         static RectEx[][] betterRects = new RectEx[][] {
             new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() },
+            new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() },
             new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() }
         };
         static VideoCapture[] capture;
         static Dictionary ArucoDict;
         static DetectorParameters ArucoParameters;
-        public static int markersLength = 81;
+        public static int markersLength = 56;
         static Mat[] cameraMatrix;
         static Mat[] distortionMatrix;
 
         public static bool useSmoothCorners = true;
         public static int cornersMaxDistance = 1;
-        public static float cornersSmoothFactor = 0.2f;
+        public static float cornersSmoothFactor = 0.1f;
+        //static Bitmap whiteLogo;
+        //static Bitmap blackLogo;
+        //static double[,,] whiteLogoGamma = new double[250, 100, 3];
+        //static double[,,] blackLogoGamma = new double[250, 100, 3];
+        //static double[] byte2floatGamma = new double[256];
+        //static byte[] float2byteGamma = new byte[256];
         public static void Init() {
-            capture = new VideoCapture[2];
-            try {
-                capture[0] = new VideoCapture(Tag.cameras[0].index, VideoCapture.API.DShow);
-            } catch (Exception e) {
-                Console.WriteLine($"Something went wrong opening camera {Tag.cameras[0].index}\n{e}");
-                System.Threading.Thread.Sleep(5000);
+            betterRects = new RectEx[Tag.cameras.Length][];
+            for (int i = 0; i < betterRects.Length; i++) {
+                betterRects[i] = new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() };
             }
-            try {
-                capture[1] = new VideoCapture(Tag.cameras[1].index, VideoCapture.API.DShow);
-            } catch (Exception e) {
-                Console.WriteLine($"Something went wrong opening camera {Tag.cameras[1].index}\n{e}");
-                System.Threading.Thread.Sleep(5000);
+            capture = new VideoCapture[Tag.cameras.Length];
+            //whiteLogo = new Bitmap(@"iVCam\black.jpg");
+            //blackLogo = new Bitmap(@"iVCam\white.jpg");
+            //for (int i = 0; i < 256; i++) {
+            //    byte2floatGamma[i] = Math.Pow(i / 255.0, 2.2);
+            //    float2byteGamma[(int)((1 - (1 - byte2floatGamma[i]) * (1 - byte2floatGamma[i])) * 255)] = (byte)(Math.Round(Math.Pow(byte2floatGamma[i], 1.0 / 2.2) * 255.0));
+            //}
+            //for (int x = 0; x < 100; x++) {
+            //    for (int y = 0; y < 250; y++) {
+            //        double lwR = Math.Pow(whiteLogo.GetPixel(y, x).R / 255f * 1.02f, 2.2f);
+            //        double lwG = Math.Pow(whiteLogo.GetPixel(y, x).G / 255f * 1.02f, 2.2f);
+            //        double lwB = Math.Pow(whiteLogo.GetPixel(y, x).B / 255f * 1.02f, 2.2f);
+            //        double lbR = Math.Pow(blackLogo.GetPixel(y, x).R / 255f, 2.2f);
+            //        double lbG = Math.Pow(blackLogo.GetPixel(y, x).G / 255f, 2.2f);
+            //        double lbB = Math.Pow(blackLogo.GetPixel(y, x).B / 255f, 2.2f);
+            //        whiteLogoGamma[y, x, 0] = lwR;
+            //        whiteLogoGamma[y, x, 1] = lwG;
+            //        whiteLogoGamma[y, x, 2] = lwB;
+            //        blackLogoGamma[y, x, 0] = lbR;
+            //        blackLogoGamma[y, x, 1] = lbG;
+            //        blackLogoGamma[y, x, 2] = lbB;
+            //    }
+            //}
+            for (int i = 0; i < Tag.cameras.Length; i++) {
+                try {
+                    capture[i] = new VideoCapture(Tag.cameras[i].index, VideoCapture.API.DShow);
+                } catch (Exception e) {
+                    Console.WriteLine($"Something went wrong opening camera {Tag.cameras[i].index}\n{e}");
+                    System.Threading.Thread.Sleep(5000);
+                }
+                capture[i].Set(CapProp.FrameWidth, Tag.cameras[i].width);
+                capture[i].Set(CapProp.FrameHeight, Tag.cameras[i].height);
             }
-            capture[0].Set(CapProp.FrameWidth, Tag.cameras[0].width);
-            capture[0].Set(CapProp.FrameHeight, Tag.cameras[0].height);
-            capture[1].Set(CapProp.FrameWidth, Tag.cameras[1].width);
-            capture[1].Set(CapProp.FrameHeight, Tag.cameras[1].height);
 
             int markersX = 4;
             int markersY = 4;
@@ -96,109 +123,161 @@ namespace TrackingSmoothing {
                 fs["dist_coeffs"].ReadMat(distortionMatrix[c]);
             }
         }
-        public static void Update() {
+        public static void Update(int c) {
             while (true) {
                 if (Program.wantToCloseWindows) {
                     CvInvoke.DestroyAllWindows();
                     Program.wantToCloseWindows = false;
                 }
                 bool shouldShowFrame = Program.wantToShowFrame;
-                for (int c = 0; c < 2; c++) {
-                    //Capture a frame with webcam
-                    Mat frame = new Mat();
-                    frame = capture[c].QueryFrame();
+                //Capture a frame with webcam
+                Mat frame = new Mat();
+                if (c >= capture.Length) {
+                    Console.WriteLine("Wait... this is illegal");
+                }
+                System.Diagnostics.Debug.WriteLine(c);
+                frame = capture[c].QueryFrame();
+                //if (c == 0)
+                //    frame = new Mat(@"C:\Users\\Videos\iVCam\2023-08-01 222744.jpg");
+                //if (c == 1
+                //    frame = new Mat(@"C:\Users\\Videos\iVCam\2023-08-01 222749.jpg");
 
-                    //frame *= 2f;
-                    //var asd = (Byte[,,])frame.GetData();
-                    //try {
-                    //for (int x = 0; x < frame.Height; x++) {
-                    //    for (int y = 0; y < frame.Width; y++) {
-                    //        asd[x, y, 0] = (Byte)Math.Min(asd[x, y, 0] * 2, 255);
-                    //    }
-                    //}
-                    //} catch (Exception e) {
-                    //    Console.WriteLine();
-                    //}
 
-                    if (!frame.IsEmpty) {
-                        //Detect markers on last retrieved frame
-                        VectorOfInt ids = new VectorOfInt(); // name/id of the detected markers
-                        VectorOfVectorOfPointF corners = new VectorOfVectorOfPointF(); // corners of the detected marker
-                        VectorOfVectorOfPointF rejected = new VectorOfVectorOfPointF(); // rejected contours
-                        ArucoInvoke.DetectMarkers(frame, ArucoDict, corners, ids, ArucoParameters, rejected);
+                //frame *= 2f;
+                //var asd = (Byte[,,])frame.GetData();
+                //try {
+                //    for (int x = 0; x < 100; x++) {
+                //        for (int y = 0; y < 250; y++) {
+                //            double cR = byte2floatGamma[asd[x, y, 0]];
+                //            double cG = byte2floatGamma[asd[x, y, 1]];
+                //            double cB = byte2floatGamma[asd[x, y, 2]];
+                //            double lwR = whiteLogoGamma[y, x, 0];
+                //            double lwG = whiteLogoGamma[y, x, 1];
+                //            double lwB = whiteLogoGamma[y, x, 2];
+                //            double lbR = blackLogoGamma[y, x, 0];
+                //            double lbG = blackLogoGamma[y, x, 1];
+                //            double lbB = blackLogoGamma[y, x, 2];
+                //            //max 210, min 163
+                //            //double lwR = Math.Pow(whiteLogo.GetPixel(y, x).R / 255f * 1.02f, 2.2f);
+                //            //double lwG = Math.Pow(whiteLogo.GetPixel(y, x).G / 255f * 1.02f, 2.2f);
+                //            //double lwB = Math.Pow(whiteLogo.GetPixel(y, x).B / 255f * 1.02f, 2.2f);
+                //            //double lbR = Math.Pow(blackLogo.GetPixel(y, x).R / 255f, 2.2f);
+                //            //double lbG = Math.Pow(blackLogo.GetPixel(y, x).G / 255f, 2.2f);
+                //            //double lbB = Math.Pow(blackLogo.GetPixel(y, x).B / 255f, 2.2f);
+                //            asd[x, y, 0] = (byte)(Math.Pow((cR - lwR) / lbR, 1 / 2.2f) * 255f);
+                //            asd[x, y, 1] = (byte)(Math.Pow((cG - lwG) / lbG, 1 / 2.2f) * 255f);
+                //            asd[x, y, 2] = (byte)(Math.Pow((cB - lwB) / lbB, 1 / 2.2f) * 255f);
+                //        }
+                //    }
+                //} catch (Exception e) {
+                //    Console.WriteLine();
+                //}
+                //GCHandle pinnedArray = GCHandle.Alloc(asd, GCHandleType.Pinned);
+                //IntPtr pointer = pinnedArray.AddrOfPinnedObject();
+                //// Do your stuff...
+                //frame = new Mat(frame.Height, frame.Width, DepthType.Cv8U, 3, pointer, 0);
+                //pinnedArray.Free();
 
-                        //smooth corners
-                        try {
-                            if (Program.preNoise)
-                                corners = SmoothCorners(c, ids, corners);
-                        } catch (Exception e) {
-                            Console.WriteLine("Couldnt smooth corners\n" + e);
+                if (!frame.IsEmpty) {
+                    //Detect markers on last retrieved frame
+                    VectorOfInt ids = new VectorOfInt(); // name/id of the detected markers
+                    VectorOfVectorOfPointF corners = new VectorOfVectorOfPointF(); // corners of the detected marker
+                    VectorOfVectorOfPointF rejected = new VectorOfVectorOfPointF(); // rejected contours
+                    ArucoInvoke.DetectMarkers(frame, ArucoDict, corners, ids, ArucoParameters, rejected);
+
+                    //smooth corners
+                    try {
+                        if (Program.preNoise) {
+                            corners = SmoothCorners(c, ids, corners);
                         }
-                        // If we detected at least one marker
-                        if (ids.Size > 0) {
-                            //Draw detected markers
-                            if (shouldShowFrame)
-                                ArucoInvoke.DrawDetectedMarkers(frame, corners, ids, new MCvScalar(255, 0, 255));
-
-                            //Estimate pose for each marker using camera calibration matrix and distortion coefficents
-                            Mat rvecs = new Mat(); // rotation vector
-                            Mat tvecs = new Mat(); // translation vector
-                            ArucoInvoke.EstimatePoseSingleMarkers(corners, markersLength, cameraMatrix[c], distortionMatrix[c], rvecs, tvecs);
-
-                            //Draw 3D orthogonal axis on markers using estimated pose
-                            for (int i = 0; i < ids.Size; i++) {
-                                //if (ids[i] != 0 && ids[i] != 4) continue;
-                                using (Mat rvecMat = rvecs.Row(i))
-                                using (Mat tvecMat = tvecs.Row(i))
-                                using (VectorOfDouble rvec = new VectorOfDouble())
-                                using (VectorOfDouble tvec = new VectorOfDouble()) {
-                                    double[] values = new double[3];
-                                    rvecMat.CopyTo(values);
-                                    rvec.Push(values);
-                                    tvecMat.CopyTo(values);
-                                    tvec.Push(values);
-                                    Mat RotMat = GetRotationMatrixFromRotationVector(rvec);
-                                    double[] dRotMat = new double[3 * 3];
-                                    RotMat.CopyTo(dRotMat);
-                                    Vector3 pos = new Vector3((float)tvec[0] / 1000f, (float)tvec[1] / 1000f, (float)tvec[2] / 1000f);
-                                    Matrix4x4 rot = new Matrix4x4(
-                                        (float)dRotMat[0], (float)dRotMat[3], (float)dRotMat[6], 0f,
-                                        (float)dRotMat[1], (float)dRotMat[4], (float)dRotMat[7], 0f,
-                                        (float)dRotMat[2], (float)dRotMat[5], (float)dRotMat[8], 0f,
-                                        0f, 0f, 0f, 1f);
-                                    //if (!Tag.newInfoReady)
-                                    Tag.RecieveTrackerAsync(ids[i], c, rot, pos);
-                                    pos.Y -= 0.1f;
-                                    Matrix4x4 finalMat = Matrix4x4.Multiply(rot, Matrix4x4.CreateTranslation(pos));
-                                    if (Program.debugSendTrackerOSC)
-                                        ArucoInvoke.DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rvec, tvec, markersLength);
-                                }
-
-                            }
-                        }
-                        int queueSize = queueCount[c];
-                        queueCount[c] = 0;
-                        for (int i = 0; i < queueSize; i++) {
-                            if (posQueue[c][i] == null || rotQueue[c][i] == null) continue;
-                            if (posQueue[c][i][2] == 0) continue;
-                            try {
-                                if (!Program.debugSendTrackerOSC)
-                                    ArucoInvoke.DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rotQueue[c][i], posQueue[c][i], markersLength * 0.5f * sclQueue[c][i]);
-                            } catch {
-                                Console.WriteLine("lol");
-                            }
-                        }
-                        //---------------------
-
-                        //Display current frame plus drawings
-                        if (shouldShowFrame) {
-                            CvInvoke.Imshow($"Image{c}", frame);
-                            CvInvoke.WaitKey(1);
-                        }
-                        frame.Dispose();
+                    } catch (Exception e) {
+                        Console.WriteLine("Couldnt smooth corners\n" + e);
                     }
+                    // If we detected at least one marker
+                    if (ids.Size > 0) {
+                        //Draw detected markers
+                        VectorOfVectorOfPointF skew;
+                        //skew = SkewRects(c, ids, corners, 2, -1);
+                        if (shouldShowFrame)
+                            ArucoInvoke.DrawDetectedMarkers(frame, corners, ids, new MCvScalar(255, 0, 255));
+
+                        //Estimate pose for each marker using camera calibration matrix and distortion coefficents
+                        //get first position to not mess with the others
+                        Mat rvecs = new Mat(); // rotation vector
+                        Mat tvecs = new Mat(); // translation vector
+                        ArucoInvoke.EstimatePoseSingleMarkers(corners, markersLength, cameraMatrix[c], distortionMatrix[c], rvecs, tvecs);
+                        SendDetectedRect(c, frame, ids, corners, -1, tvecs);
+
+                        skew = SkewRects(c, ids, corners, 0, -1);
+                        SendDetectedRect(c, frame, ids, skew, 0, tvecs);
+                        skew = SkewRects(c, ids, corners, 1, -1);
+                        SendDetectedRect(c, frame, ids, skew, 1, tvecs);
+                        skew = SkewRects(c, ids, corners, 2, -1);
+                        SendDetectedRect(c, frame, ids, skew, 2, tvecs);
+                        skew = SkewRects(c, ids, corners, 3, -1);
+                        SendDetectedRect(c, frame, ids, skew, 3, tvecs);
+                    }
+                    int queueSize = queueCount[c];
+                    queueCount[c] = 0;
+                    for (int i = 0; i < queueSize; i++) {
+                        if (posQueue[c][i] == null || rotQueue[c][i] == null) continue;
+                        if (posQueue[c][i][2] == 0) continue;
+                        try {
+                            if (!Program.debugSendTrackerOSC || true)
+                                ArucoInvoke.DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rotQueue[c][i], posQueue[c][i], markersLength * 0.5f * sclQueue[c][i]);
+                        } catch {
+                            //Console.WriteLine("lol");
+                        }
+                    }
+                    //---------------------
+
+                    //Display current frame plus drawings
+                    if (shouldShowFrame) {
+                        CvInvoke.Imshow($"Image{c}", frame);
+                        CvInvoke.WaitKey(1);
+                    }
+                    frame.Dispose();
                 }
                 Tag.newInfoReady = true;
+            }
+
+            static void SendDetectedRect(int c, Mat frame, VectorOfInt ids, VectorOfVectorOfPointF corners, int altCorner, Mat tvecs0) {
+                Mat rvecs = new Mat(); // rotation vector
+                Mat tvecs = new Mat(); // translation vector
+                ArucoInvoke.EstimatePoseSingleMarkers(corners, markersLength, cameraMatrix[c], distortionMatrix[c], rvecs, tvecs);
+                tvecs = tvecs0;
+
+                //Draw 3D orthogonal axis on markers using estimated pose
+                for (int i = 0; i < ids.Size; i++) {
+                    //if (ids[i] != 0 && ids[i] != 4) continue;
+                    using (Mat rvecMat = rvecs.Row(i))
+                    using (Mat tvecMat = tvecs.Row(i))
+                    using (VectorOfDouble rvec = new VectorOfDouble())
+                    using (VectorOfDouble tvec = new VectorOfDouble()) {
+                        double[] values = new double[3];
+                        rvecMat.CopyTo(values);
+                        rvec.Push(values);
+                        tvecMat.CopyTo(values);
+                        tvec.Push(values);
+                        Mat RotMat = GetRotationMatrixFromRotationVector(rvec);
+                        double[] dRotMat = new double[3 * 3];
+                        RotMat.CopyTo(dRotMat);
+                        Vector3 pos = new Vector3((float)tvec[0] / 1000f, (float)tvec[1] / 1000f, (float)tvec[2] / 1000f);
+                        Matrix4x4 rot = new Matrix4x4(
+                            (float)dRotMat[0], (float)dRotMat[3], (float)dRotMat[6], 0f,
+                            (float)dRotMat[1], (float)dRotMat[4], (float)dRotMat[7], 0f,
+                            (float)dRotMat[2], (float)dRotMat[5], (float)dRotMat[8], 0f,
+                            0f, 0f, 0f, 1f);
+                        //if (!Tag.newInfoReady)
+                        Tag.RecieveTrackerAsync(ids[i], c, rot, pos, altCorner);
+                        //Console.WriteLine($"{c} - {i} = {pos.X}\t{pos.Y}\t{pos.Z}");
+                        pos.Y -= 0.1f;
+                        Matrix4x4 finalMat = Matrix4x4.Multiply(rot, Matrix4x4.CreateTranslation(pos));
+                        if (Program.debugSendTrackerOSC && altCorner == -1 && false)
+                            ArucoInvoke.DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rvec, tvec, markersLength);
+                    }
+
+                }
             }
         }
 
@@ -216,8 +295,10 @@ namespace TrackingSmoothing {
                         wrongs++;
                 }
                 if (wrongs == 0) {
-                    betterRects[c][id].locked = true;
-                    betterRects[c][id].lockedVals = curr;
+                    if (betterRects[c][id].locked == false) {
+                        betterRects[c][id].locked = true;
+                        betterRects[c][id].lockedVals = curr;
+                    }
                 } else {
                     if (betterRects[c][id].locked) {
                         wrongs = 0;
@@ -225,7 +306,7 @@ namespace TrackingSmoothing {
                             if (Math.Abs(lokd[j].X - curr[j].X) > cornersMaxDistance || Math.Abs(lokd[j].Y - curr[j].Y) > cornersMaxDistance)
                                 wrongs++;
                         }
-                        if (wrongs > 3) {
+                        if (wrongs > 2) {
                             betterRects[c][id].locked = false;
                         }
                     }
@@ -246,8 +327,32 @@ namespace TrackingSmoothing {
             corners = new(rects);
             return corners;
         }
+        static VectorOfVectorOfPointF SkewRects(int c, VectorOfInt ids, VectorOfVectorOfPointF corners, int c1, int c2) {
+            PointF[][] rects = new PointF[ids.Size][];
+            for (int i = 0; i < ids.Size; i++) {
+                rects[i] = new PointF[4];
+                rects[i] = corners[i].ToArray();
+                Vector3 center = new Vector3();
+                for (int j = 0; j < 4; j++) {
+                    center.X += rects[i][j].X;
+                    center.Y += rects[i][j].Y;
+                }
+                center /= 4;
+                rects[i][c1].X = rects[i][c1].X * 0.95f + center.X * 0.05f;
+                rects[i][c1].Y = rects[i][c1].Y * 0.95f + center.Y * 0.05f;
+                int[] inv = new int[] { 2, 3, 0, 1 };
+                int ic1 = inv[c1];
+                rects[i][ic1].X = rects[i][ic1].X + (rects[i][ic1].X - center.X) * 0.1f;
+                rects[i][ic1].Y = rects[i][ic1].Y + (rects[i][ic1].Y - center.Y) * 0.1f;
+                if (c2 == -1) continue;
+                rects[i][c2].X = rects[i][c2].X * 0.95f - center.X * 0.05f;
+                rects[i][c2].Y = rects[i][c2].Y * 0.95f - center.Y * 0.05f;
+            }
+            return new(rects);
+        }
 
-        static int[] queueCount = new int[2];
+        //TODO: add multiple camera support
+        static int[] queueCount = new int[3];
         static int maxQueue = 30;
         static float[][] sclQueue = new float[][] { new float[maxQueue], new float[maxQueue] };
         static VectorOfDouble[][] posQueue = new VectorOfDouble[][] { new VectorOfDouble[maxQueue], new VectorOfDouble[maxQueue] };
@@ -285,7 +390,7 @@ namespace TrackingSmoothing {
             rotQueue[cam][queueCount[cam]] = rvec2;
             if (scl == 0)
                 scl = 0.1f;
-            sclQueue[cam][queueCount[cam]] = scl;
+            sclQueue[cam][queueCount[cam]] = scl * 3;
             queueCount[cam]++;
         }
         static Mat GetRotationMatrixFromRotationVector(VectorOfDouble rvec) {

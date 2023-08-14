@@ -15,11 +15,48 @@ namespace TrackingSmoothing {
             public int index = 0;
             public CombinedTracker(int index) {
                 this.index = index;
+                trackerStraightness = new float[cameras.Length];
+                trackerPresence = new int[cameras.Length];
+                updateCount = new int[cameras.Length];
+                singles = new SingleTracker[cameras.Length];
+                for (int i = 0; i < singles.Length; i++) {
+                    singles[i] = new SingleTracker();
+                }
             }
             public Quaternion lastRotAgreed = new Quaternion();
             public bool allAgreed = false;
             public Matrix4x4 lastSent = new Matrix4x4();
-            public void Recieve(int camera, Vector3 pos, Matrix4x4 rot) {
+            public void Recieve(int camera, Vector3 pos, Matrix4x4 rot, int altRot) {
+                if (altRot != -1) {
+                    //FILTER ROTATION FOR ALTERNATES
+                    if (updateCount[camera] > 1) {
+                        singles[camera].altRotList[altRot].Clear();
+                    }
+                    singles[camera].altRotList[altRot].Insert(0, Quaternion.CreateFromRotationMatrix(rot));
+                    if (singles[camera].altRotList[altRot].Count > 10)
+                        singles[camera].altRotList[altRot].RemoveAt(singles[camera].altRotList[altRot].Count - 1);
+                    List<Quaternion> r1ListAlt = new List<Quaternion>();
+                    List<Quaternion> r2ListAlt = new List<Quaternion>();
+                    Quaternion lastRot1Alt = singles[camera].altRotList[altRot][0];
+                    r1ListAlt.Add(lastRot1Alt);
+                    bool switchedAlt = false;
+                    for (int i = 1; i < singles[camera].altRotList[altRot].Count; i++) {
+                        Quaternion curRot = singles[camera].altRotList[altRot][i];
+                        float rotDiff = Quaternion.Dot(Quaternion.Inverse(lastRot1Alt) * curRot, Quaternion.Identity);
+                        if (rotDiff < 0.9f) {
+                            switchedAlt = !switchedAlt;
+                        }
+                        if (switchedAlt) r2ListAlt.Add(curRot);
+                        else r1ListAlt.Add(curRot);
+                        lastRot1Alt = curRot;
+                    }
+                    if (r1ListAlt.Count < r2ListAlt.Count && Program.preNoise) {
+                        rot = Matrix4x4.CreateFromQuaternion(r2ListAlt[0]);
+                    }
+                    singles[camera].altRots[altRot] = rot;
+                    return;
+                }
+
                 //TEST DEPTH
                 //Random rnd = new Random();
                 //if (rnd.NextDouble() < 0.3f)
@@ -109,7 +146,7 @@ namespace TrackingSmoothing {
                 singles[camera].filter_pos.UpdateParams(trackerPresence[camera] + 0.01f);
                 if (trackerPresence[camera] == 0) {
                     for (int i = 0; i < 5; i++) { //to make sure is snapped
-                    singles[camera].smooth_pos = singles[camera].filter_pos.Filter(pos);
+                        singles[camera].smooth_pos = singles[camera].filter_pos.Filter(pos);
                     }
                 }
                 singles[camera].smooth_pos = singles[camera].filter_pos.Filter(pos);
@@ -124,24 +161,49 @@ namespace TrackingSmoothing {
                 updateCount[camera] = 0;
 
                 //CHECK FOR ROTATION STARIGHTNESS
-                    Quaternion q = Quaternion.CreateFromRotationMatrix(singles[camera].rot);
-                    Matrix4x4 mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0, 0, -0.1f)), Matrix4x4.Multiply(rot, Matrix4x4.CreateTranslation(pos)));
-                    float depth = singles[camera].pos.Z;
-                    if (depth == 0) depth = 1;
-                    float d = Utils.GetDistance(singles[camera].pos.X / depth, singles[camera].pos.Y / depth, 0, 0, 0, 0) * 0.12f;
-                    d -= depth / cameras[camera].quality / 4f;
-                    float r1 = mat.Translation.Z - pos.Z + 0.1f;
-                    float r2 = Utils.GetMap(r1, 0.2f, 0, 0.2f, d);
-                    trackerStraightness[camera] = r2;
-                    //Console.WriteLine($"{mat.Translation.Z.ToString("0.00")} / {pos.Z.ToString("0.00")} / {r1.ToString("0.00")} ( {r2.ToString("0.00")} ) // {d.ToString("0.00")} / {singles[i].pos.Z.ToString("0.00")}");
-                    //Console.WriteLine($"{pitch.ToString("0.00")} // {(singles[i].pos.Y / singles[i].pos.Z).ToString("0.00")} / {singles[i].pos.Y.ToString("0.00")} / {singles[i].pos.Z.ToString("0.00")}");
+                //i dont remember what is this for lol
+                //Quaternion q = Quaternion.CreateFromRotationMatrix(singles[camera].rot);
+                //Matrix4x4 mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0, 0, -0.1f)), Matrix4x4.CreateTranslation(pos));
+                //float depth = singles[camera].pos.Z;
+                //if (depth == 0) depth = 1;
+                //float d = Utils.GetDistance(singles[camera].pos.X / depth, singles[camera].pos.Y / depth, 0, 0, 0, 0) * 0.12f;
+                //d -= depth / cameras[camera].quality / 4f;
+                //float r1 = mat.Translation.Z - pos.Z + 0.1f;
+                //float r2 = Utils.GetMap(r1, 0.2f, 0, 0.2f, d);
+                ////trackerStraightness[camera] = r2;
+                trackerStraightness[camera] = 0;
+
+                //if (Program.preNoise && false) {
+                //    Matrix4x4 matp = Matrix4x4.Multiply(rot, Matrix4x4.CreateTranslation(pos));
+                //    Matrix4x4 mat0 = Matrix4x4.CreateLookAt(Vector3.Zero, pos, new Vector3(0, 1, 0));
+                //    matp = Matrix4x4.Multiply(matp, mat0);
+                //    pos = matp.Translation;
+                //    rot = Matrix4x4.CreateFromQuaternion(matp.Rotation());
+                //    //singles[camera].pos = pos;
+                //    //singles[camera].rot = rot;
+                //    Quaternion dif = Quaternion.Subtract(rot.Rotation(), singles[camera].rot.Rotation());
+                //    Quaternion rrr = singles[camera].rot.Rotation();
+                //    if (camera == 0 && (index == 1 || index == 6))
+                //        Console.WriteLine($"{index} - {rrr.X}, {rrr.Y}, {rrr.Z}, {rrr.W}");
+                //    rrr.Z = -rrr.Z;
+                //    rrr.W = -rrr.W;
+                //    singles[camera].rot = Matrix4x4.CreateFromQuaternion(rrr);
+                //}
+                //Console.WriteLine($"{mat.Translation.Z.ToString("0.00")} / {pos.Z.ToString("0.00")} / {r1.ToString("0.00")} ( {r2.ToString("0.00")} ) // {d.ToString("0.00")} / {singles[i].pos.Z.ToString("0.00")}");
+                //Console.WriteLine($"{pitch.ToString("0.00")} // {(singles[i].pos.Y / singles[i].pos.Z).ToString("0.00")} / {singles[i].pos.Y.ToString("0.00")} / {singles[i].pos.Z.ToString("0.00")}");
             }
-            public Matrix4x4[] Obtain() {
+            public Matrix4x4[] Obtain(int altRot1 = -1, int altRot2 = -1) {
                 //COMBINE ROT MATRIX WITH POS VECTOR
                 float depth1 = singles[0].smooth_pos.Z;
                 float depth2 = singles[1].smooth_pos.Z;
                 Matrix4x4 rot1 = singles[0].rot;
                 Matrix4x4 rot2 = singles[1].rot;
+                if (altRot1 != -1 && altRot1 < 4) {
+                    rot1 = singles[0].altRots[altRot1];
+                }
+                if (altRot2 != -1 && altRot2 < 4) {
+                    rot2 = singles[1].altRots[altRot2];
+                }
                 Matrix4x4[] pos = new Matrix4x4[] {
                     Matrix4x4.Multiply(rot1, Matrix4x4.CreateTranslation(singles[0].pos.X * cameras[0].depthMult, singles[0].pos.Y * cameras[0].depthMult, depth1 * cameras[0].depthMult)),
                     Matrix4x4.Multiply(rot2, Matrix4x4.CreateTranslation(singles[1].pos.X * cameras[1].depthMult, singles[1].pos.Y * cameras[1].depthMult, depth2 * cameras[1].depthMult))

@@ -1,4 +1,4 @@
-updatesPerSecond=80
+updatesPerSecond=60
 trackerDelay=300
 poseAdjust=true
 poseAdjustLegDistance=0.5
@@ -8,6 +8,7 @@ tagsToCalibrateWeight=1,1,1,1
 tagsOnFloor=0,2,4,6
 oscAddress=127.0.0.1
 oscPort=39570
+totalCameras=2
 camera1Quality=1.1
 camera0File=cameraParameters1.xml
 camera1File=cameraParameters2.xml

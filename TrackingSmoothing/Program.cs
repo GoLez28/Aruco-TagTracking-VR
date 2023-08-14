@@ -23,6 +23,7 @@ namespace TrackingSmoothing {
 
         public static bool preNoise = true;
         public static int postNoise = 1;
+        public static int clusterRotationGuess = 1;
         public static bool ignoreNoisyRotation = true;
 
         public static float[] hmdPos = new float[3];
@@ -34,6 +35,7 @@ namespace TrackingSmoothing {
                 return offsetMat.Translation;
             }
         }
+        public static Vector3 roomOffset = Vector3.Zero;
         public static float rotationX = 0;
         public static float rotationY = 0;
         public static float rotationZ = 0;
@@ -41,6 +43,7 @@ namespace TrackingSmoothing {
         public static float trackerDelay = 300f;
         public static bool wantToShowFrame = false;
         public static bool adjustOffset = false;
+        public static bool autoOffset = false;
         public static bool cannotGetControllers = false;
         public static bool isMoveKeyPressed = false;
         public static bool isRotateKeyPressed = false;
@@ -59,9 +62,11 @@ namespace TrackingSmoothing {
         public static bool debugSendTrackerOSC = false;
 
         public static Stopwatch timer = new Stopwatch();
+        public static int nextSave = 10;
         public static Valve.VR.TrackedDevicePose_t[] devPos = new Valve.VR.TrackedDevicePose_t[4];
         public static Valve.VR.HmdMatrix34_t prevCont = new();
         public static int frameCount = 0;
+        public static string infoBarWarning = "";
         static void Main(string[] args) {
             /////////////////////////////////////////////////
             ///TODO:    Fix all this crap of laggy code
@@ -79,7 +84,9 @@ namespace TrackingSmoothing {
             } catch (Exception e) {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"Could not initialize ovr\nerror:{e}");
+#if RELEASE
                 System.Threading.Thread.Sleep(1000);
+#endif
                 ovrNotFound = true;
                 Console.ResetColor();
             }
@@ -106,9 +113,14 @@ namespace TrackingSmoothing {
             double previousTime = 0;
 
             //I fucking hate async programing, the only thing it does is crash
-            System.Threading.ThreadStart updateVideoFunc = new ThreadStart(Aruco.Update);
-            System.Threading.Thread videoCapture = new System.Threading.Thread(updateVideoFunc);
-            videoCapture.Start();
+            Tag.lastFrameTime = new double[Tag.cameras.Length];
+            System.Threading.Thread[] videoCapture = new System.Threading.Thread[Tag.cameras.Length];
+            for (int i = 0; i < Tag.cameras.Length; i++) {
+                int cam = i;
+                videoCapture[i] = new System.Threading.Thread(() => Aruco.Update(cam));
+                //Console.WriteLine($"start {i}");
+                videoCapture[i].Start();
+            }
             while (true) {
                 double delta = timer.Elapsed.TotalMilliseconds - previousTime;
                 previousTime = timer.Elapsed.TotalMilliseconds;
@@ -129,7 +141,14 @@ namespace TrackingSmoothing {
                     for (int i = initX; i < endX; i++) {
                         Console.Write(" ");
                     }
-                    Console.Write($"App TPS: {delta:0.00}");
+                    Console.Write($"App TPS: {(1000.0 / delta):0.00}");
+                    initX = Console.CursorLeft;
+                    endX = (initX / 8 + 2) * 8;
+                    for (int i = initX; i < endX; i++) {
+                        Console.Write(" ");
+                    }
+                    Console.Write(infoBarWarning);
+                    infoBarWarning = "";
                     for (int i = Console.CursorLeft; i < Console.WindowWidth; i++) {
                         Console.Write(" ");
                     }
@@ -191,18 +210,20 @@ namespace TrackingSmoothing {
                     Vector3 headInOffset = new Vector3(0, 0, 0.1f);
                     hmdRotMat = Matrix4x4.Multiply(hmdRotMat, Matrix4x4.CreateTranslation(headInOffset));
                 }
-                Vector3 hmdPosV3 = hmdRotMat.Translation;
+                Matrix4x4 hmdCentered = hmdRotMat;
+                hmdCentered = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), hmdCentered);
+                Vector3 hmdPosV3 = hmdCentered.Translation;
                 hmdPos[0] = hmdPosV3.X;
                 hmdPos[1] = hmdPosV3.Y;
                 hmdPos[2] = hmdPosV3.Z;
-                Vector3 hmdRotEuler = Tag.ToEulerAngles(Quaternion.CreateFromRotationMatrix(hmdRotMat));
+                Vector3 hmdRotEuler = Tag.ToEulerAngles(Quaternion.CreateFromRotationMatrix(hmdCentered));
                 hmdRot[0] = hmdRotEuler.X;
                 hmdRot[1] = hmdRotEuler.Y;
                 hmdRot[2] = hmdRotEuler.Z;
 
                 float time = timer.ElapsedMilliseconds / 1000000f;
                 trackerDelay = 300f;
-                hmdList.Add(new Vector4(m.m3, m.m7, m.m11, time));
+                hmdList.Add(new Vector4(hmdPosV3.X, hmdPosV3.Y, hmdPosV3.Z, time));
                 while (hmdList.Count > 1 && hmdList[0].W < time - trackerDelay / 1000000f)
                     hmdList.RemoveAt(0);
 
@@ -211,14 +232,43 @@ namespace TrackingSmoothing {
                 Tag.SendTrackers();
                 if (debugSendTrackerOSC) {
                     oscClientDebug.Send("/debug/final/position", 10,
-                                               hmdPosV3.X, hmdPosV3.Y, -hmdPosV3.Z, //1f, 1.7f, 1f
-                                               0, 0, 0, 1);
+                                       hmdPosV3.X, hmdPosV3.Y, -hmdPosV3.Z, //1f, 1.7f, 1f
+                                       0, 0, 0, 1);
                     Matrix4x4 mat = hmdRotMat;
                     mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), mat);
+                    //mat.M42 = hmdRotMat.M42;
                     Vector3 matT = mat.Translation;
                     oscClientDebug.Send("/debug/final/position", 9,
                                                matT.X, matT.Y, -matT.Z, //1f, 1.7f, 1f
                                                0, 0, 0, 1);
+
+                    int waist = -1;
+                    int leftfoot = -1;
+                    int rightfoot = -1;
+                    for (int i = 0; i < Tag.finals.Length; i++) {
+                        if (Tag.finals[i].name.Equals("leftfoot"))
+                            leftfoot = i;
+                        if (Tag.finals[i].name.Equals("rightfoot"))
+                            rightfoot = i;
+                        if (Tag.finals[i].name.Equals(poseAdjustWaist))
+                            waist = i;
+                    }
+                    Vector3 pos = Tag.finals[waist].fpos;
+                    Quaternion q = Tag.finals[waist].frot;
+                    Matrix4x4 matw = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(q), Matrix4x4.CreateTranslation(pos));
+                    matw = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-0.15f, 0f, 0f)), matw);
+                    //matw = Matrix4x4.Multiply(mat, Program.offsetMat);
+                    //matw.M41 -= (Program.hmdList[0].X - Program.hmdPos[0]) * Tag.trackers[waist].trackerFollowWeight;
+                    //matw.M43 -= (Program.hmdList[0].Y - Program.hmdPos[1]) * Tag.trackers[waist].trackerFollowWeight;
+                    //matw.M42 += (Program.hmdList[0].Z - Program.hmdPos[2]) * Tag.trackers[waist].trackerFollowWeight;
+                    oscClientDebug.Send("/debug/final/position", 6,
+                                               matw.Translation.X, matw.Translation.Z, matw.Translation.Y, //1f, 1.7f, 1f
+                                               -q.X, -q.Z, -q.Y, q.W);
+                }
+                if (autoOffset) {
+                    AdjustOffset(hmdRotMat);
+                    autoOffset = false;
+                    Console.WriteLine("Adjusted offsets");
                 }
                 //A mimir, wait for next frame (80fps)
                 System.Threading.Thread.Sleep(1000 / updateFPS);
@@ -227,9 +277,77 @@ namespace TrackingSmoothing {
                 frameCount++;
             }
         }
+
+        private static void AdjustOffset(Matrix4x4 hmdRotMat) {
+            offsetMat = Matrix4x4.Identity;
+            Matrix4x4 mat = hmdRotMat;
+            mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.18f)), mat); //0.09 = center of head, 0.2 = center of body
+            mat.M42 = hmdRotMat.M42;
+            //hmdRotMat = Matrix4x4.Multiply(hmdRotMat, Matrix4x4.CreateRotationY((float)Math.PI));
+            float asd = mat.M42;
+            mat.M42 = mat.M43;
+            mat.M43 = -asd;
+            mat.M41 = -mat.M41;
+
+
+
+            asd = hmdRotMat.M42;
+            hmdRotMat.M42 = hmdRotMat.M43;
+            hmdRotMat.M43 = -asd;
+            hmdRotMat.M41 = -hmdRotMat.M41;
+            int waist = -1;
+            int leftfoot = -1;
+            int rightfoot = -1;
+            for (int i = 0; i < Tag.finals.Length; i++) {
+                if (Tag.finals[i].name.Equals("leftfoot"))
+                    leftfoot = i;
+                if (Tag.finals[i].name.Equals("rightfoot"))
+                    rightfoot = i;
+                if (Tag.finals[i].name.Equals(poseAdjustWaist))
+                    waist = i;
+            }
+            Vector3 mid = (Tag.finals[leftfoot].preMat.Translation + Tag.finals[rightfoot].preMat.Translation) / 2f;
+            Matrix4x4 dir = Matrix4x4.CreateLookAt(mid, Tag.finals[rightfoot].preMat.Translation, new Vector3(0, 1f, 0));
+            Matrix4x4 newWaist = Matrix4x4.Multiply(Tag.finals[waist].preMat, dir);
+            newWaist = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-0.15f, 0f, 0f)), newWaist);
+            dir = Matrix4x4.Multiply(dir, Matrix4x4.CreateLookAt(Vector3.Zero, newWaist.Translation, new Vector3(0, 1f, 0)));
+            dir = Matrix4x4.Multiply(dir, Matrix4x4.CreateLookAt(Vector3.Zero, hmdRotMat.Translation - mat.Translation, new Vector3(0, 1f, 0)));
+            dir = Matrix4x4.Multiply(dir, Matrix4x4.CreateFromYawPitchRoll(-(float)Math.PI / 2f, (float)Math.PI * 1.5f, 0));
+            newWaist = Matrix4x4.Multiply(Tag.finals[waist].preMat, dir);
+            //asd = newWaist.M42;
+            //newWaist.M42 = newWaist.M43;
+            //newWaist.M43 = -asd;
+            newWaist.M43 = -newWaist.M43;
+            newWaist = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-0.15f, 0f, 0f)), newWaist);
+            //oscClientDebug.Send("/debug/final/position", 10,
+            //                           mat.Translation.X, mat.Translation.Y, -mat.Translation.Z, //1f, 1.7f, 1f
+            //                           0, 0, 0, 1);
+            //oscClientDebug.Send("/debug/final/position", 9,
+            //                           newWaist.Translation.X, newWaist.Translation.Y, -newWaist.Translation.Z, //1f, 1.7f, 1f
+            //                           0, 0, 0, 1);
+            Matrix4x4 diff;
+            Matrix4x4.Invert(Matrix4x4.CreateTranslation(mat.Translation - newWaist.Translation), out diff);
+            dir = Matrix4x4.Multiply(dir, diff);
+            dir.M43 -= poseAdjustLegDist * 1f;
+            //Matrix4x4.Invert(dir, out offsetMat);
+            offsetMat = dir;
+            offsetMat.M41 = offsetMat.M41 + roomOffset.X;
+            offsetMat.M42 = offsetMat.M42 + roomOffset.Y;
+            offsetMat.M43 = offsetMat.M43 + roomOffset.Z;
+
+            Quaternion q = Quaternion.CreateFromRotationMatrix(offsetMat);
+            var yaw = Math.Atan2(2.0 * (q.Y * q.Z + q.W * q.X), q.W * q.W - q.X * q.X - q.Y * q.Y + q.Z * q.Z);
+            var pitch = Math.Asin(-2.0 * (q.X * q.Z - q.W * q.Y));
+            var roll = Math.Atan2(2.0 * (q.X * q.Y + q.W * q.Z), q.W * q.W + q.X * q.X - q.Y * q.Y - q.Z * q.Z);
+            rotationZ = (float)yaw;
+            rotationX = (float)pitch;
+            rotationY = (float)roll;
+            //Matrix4x4.Invert(diff, out offsetMat);
+        }
+
         static void ShowHint() {
             Console.WriteLine($"\n[D8] Reset Trackers (VMT)\n[Space] Show Hints\n[D1] Calibrate Cameras\n[D2] Manual Offset Adjust: {Show(adjustOffset)}" +
-                $"\n[D3] Reload Offsets\n[D4] Reloaded Config/Trackers\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}\n[D9] Show Camera Windows\n[D0] Clear Console" +
+                $"\n[D3] Reload Offsets\n[D4] Reloaded Config/Trackers\n[D5] Auto Adjust Offsets\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}\n[D9] Show Camera Windows\n[D0] Clear Console" +
                 $"\n[M] Pre-Pose Noise Reduction: {Show(preNoise)}\n[N] Post-Pose Noise Reduction: {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}" +
                 $"\n[Q]-[W] X: {offset.X}\n[A]-[S] Y: {offset.Y}\n[Z]-[X] Z: {offset.Z}\n[E]-[R] Yaw: {rotationY}\n[D]-[F] xRot: {rotationX}\n[C]-[V] zRot: {rotationZ}");
             if (ovrNotFound) {
@@ -240,28 +358,62 @@ namespace TrackingSmoothing {
         }
         static void KeyPressed(ConsoleKey key) {
             Console.Write($"Pressed {key}: ");
+            offsetMat.M41 = offsetMat.M41 - roomOffset.X;
+            offsetMat.M42 = offsetMat.M42 - roomOffset.Y;
+            offsetMat.M43 = offsetMat.M43 - roomOffset.Z;
             if (key == ConsoleKey.D8) {
                 oscClient.Send("VMT/Reset");
                 Console.WriteLine($"Sent Reset to VMT");
             } else if (key == ConsoleKey.Spacebar) {
                 ShowHint();
             } else if (key == ConsoleKey.D1) {
-                //ArUco.cameras[0].saveMat = false;
-                //ArUco.cameras[1].saveMat = false;
-                offsetMat.M41 = 0f;
-                offsetMat.M43 = 0f;
-                offsetMat.M42 = 0f;
-                rotationY = 0;
-                ApplyOffset();
-                Tag.cameras[0].minScore = float.MaxValue;
-                Tag.cameras[1].minScore = float.MaxValue;
-                Tag.endedSearching = false;
-                if (timer.ElapsedMilliseconds - Tag.saveMatTime < 20000) {
+                if (Tag.getRawTrackersStep > -1) {
+                    if (Tag.getRawTrackersStep != -2) {
+                        Tag.cameras[0].minScore = float.MaxValue;
+                        Tag.cameras[1].minScore = float.MaxValue;
+                        Tag.endedSearching = false;
+                        Tag.saveMatTime = timer.ElapsedMilliseconds;
+                        Tag.getRawTrackersStep = -2;
+                        Console.WriteLine("Averaging...");
+                    }
+                } else if (Tag.getRawTrackersStep == -2) {
                     Tag.saveMatTime = -20000;
                     Console.WriteLine("Stopped...");
                 } else {
-                    Tag.saveMatTime = timer.ElapsedMilliseconds;
-                    Console.WriteLine("Averaging...");
+                    Tag.addNewRaw = false;
+                    Tag.newTrackersReady = false;
+                    Tag.combinedTrackers = new();
+                    offsetMat.M41 = 0f;
+                    offsetMat.M43 = 0f;
+                    offsetMat.M42 = 0f;
+                    rotationY = 0;
+                    rotationZ = 0;
+                    rotationX = 0;
+                    ApplyOffset();
+                    Tag.getRawTrackersStep = 0;
+                    Tag.getSnapshot = false;
+                    Tag.timedSnapshot = false;
+                    Console.WriteLine("Press [1] to start averaging, press [2] to add available trackers, press [3] to add automatically");
+                }
+            } else if (key == ConsoleKey.D2) {
+                if (Tag.getRawTrackersStep > -1) {
+                    Tag.addNewRaw = true;
+                } else {
+                    cannotGetControllers = false;
+                    adjustOffset = !adjustOffset;
+                    isMoveKeyPressed = false;
+                    isRotateKeyPressed = false;
+                    Console.WriteLine($"Adjust offset by hand: " + Show(adjustOffset));
+                    if (adjustOffset)
+                        Console.WriteLine("Move offset with Grip, rotate with Trigger. Or press [P] to move and [O] to rotate instead");
+                }
+            } else if (key == ConsoleKey.D3) {
+                if (Tag.getRawTrackersStep > -1) {
+                    Tag.timedSnapshot = !Tag.timedSnapshot;
+                    Console.WriteLine($"Timed snap {(Tag.timedSnapshot ? "activated" : "deactivated")}");
+                } else {
+                    LoadOffsets();
+                    Console.WriteLine($"Reloaded Offsets");
                 }
             } else if (key == ConsoleKey.Q) {
                 offsetMat.M41 -= 0.01f;
@@ -312,14 +464,6 @@ namespace TrackingSmoothing {
                 Console.Clear();
                 Console.WriteLine();
                 ShowHint();
-            } else if (key == ConsoleKey.D2) {
-                cannotGetControllers = false;
-                adjustOffset = !adjustOffset;
-                isMoveKeyPressed = false;
-                isRotateKeyPressed = false;
-                Console.WriteLine($"Adjust offset by hand: " + Show(adjustOffset));
-                if (adjustOffset)
-                    Console.WriteLine("Move offset with Grip, rotate with Trigger. Or press [P] to move and [O] to rotate instead");
             } else if (key == ConsoleKey.D7) {
                 debugSendTrackerOSC = !debugSendTrackerOSC;
                 Console.WriteLine($"Send Debug Trackers: " + Show(debugSendTrackerOSC));
@@ -341,13 +485,13 @@ namespace TrackingSmoothing {
                         oscClientDebug.StopClient();
                     }
                 }
-            } else if (key == ConsoleKey.D3) {
-                LoadOffsets();
-                Console.WriteLine($"Reloaded Offsets");
             } else if (key == ConsoleKey.D4) {
                 ReadConfig();
                 Tag.ReadTrackers();
                 Console.WriteLine($"Reloaded Config / Trackers");
+            } else if (key == ConsoleKey.D5) {
+                autoOffset = !autoOffset;
+                Console.WriteLine($"Auto Adjust Offset");
             } else if (key == ConsoleKey.P) {
                 if (adjustOffset) {
                     isMoveKeyPressed = !isMoveKeyPressed;
@@ -366,7 +510,14 @@ namespace TrackingSmoothing {
                 if (postNoise > 2) postNoise = 0;
                 Tag.SetFinalTrackers(postNoise == 2);
                 Console.WriteLine($"Toggle post-pose noise reduction {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}");
+            } else if (key == ConsoleKey.B) {
+                clusterRotationGuess++;
+                if (clusterRotationGuess > 2) clusterRotationGuess = 0;
+                Console.WriteLine($"Guess cluster rotation: {(clusterRotationGuess == 0 ? "Disabled" : clusterRotationGuess == 1 ? "Enabled" : "CPU Heavy")}");
             }
+            offsetMat.M41 = offsetMat.M41 + roomOffset.X;
+            offsetMat.M42 = offsetMat.M42 + roomOffset.Y;
+            offsetMat.M43 = offsetMat.M43 + roomOffset.Z;
             //if (debugSendTrackerOSC) {
             //    if (key == ConsoleKey.Z) {
             //        Matrix4x4 newRot = Matrix4x4.CreateFromYawPitchRoll(0, 0, 0.01f);
@@ -447,7 +598,17 @@ namespace TrackingSmoothing {
                 else if (split[0].Equals("oscPort")) oscPortOut = int.Parse(split[1]);
                 else if (split[0].Equals("useVrchatOscTrackers")) useVRChatOSCTrackers = split[1].Equals("true");
                 else if (split[0].Equals("sendHeadTracker")) sendHeadTracker = split[1].Equals("true");
-                else if (split[0].Equals("trackerSize")) { Aruco.markersLength = int.Parse(split[1]); } else if (split[0].Equals("updatesPerSecond")) { updateFPS = int.Parse(split[1]); } else if (split[0].Equals("useSmoothCorners")) { Aruco.useSmoothCorners = split[1].Equals("true"); } else if (split[0].Equals("cornersMaxDistance")) { Aruco.cornersMaxDistance = int.Parse(split[1]); } else if (split[0].Equals("cornersSmoothFactor")) { Aruco.cornersSmoothFactor = float.Parse(split[1], any, invariantCulture); } else if (split[0].Equals("refineSearch")) { Tag.refineSearch = split[1].Equals("true"); } else if (split[0].Equals("refineIterations")) { Tag.refineIterations = int.Parse(split[1]); } else if (split[0].Equals("tagsToCalibrate")) {
+                else if (split[0].Equals("roomOffsetX")) roomOffset.X = float.Parse(split[1], any, invariantCulture);
+                else if (split[0].Equals("roomOffsetY")) roomOffset.Y = float.Parse(split[1], any, invariantCulture);
+                else if (split[0].Equals("roomOffsetZ")) roomOffset.Z = float.Parse(split[1], any, invariantCulture);
+                else if (split[0].Equals("trackerSize")) Aruco.markersLength = int.Parse(split[1]);
+                else if (split[0].Equals("updatesPerSecond")) updateFPS = int.Parse(split[1]);
+                else if (split[0].Equals("useSmoothCorners")) Aruco.useSmoothCorners = split[1].Equals("true");
+                else if (split[0].Equals("cornersMaxDistance")) Aruco.cornersMaxDistance = int.Parse(split[1]);
+                else if (split[0].Equals("cornersSmoothFactor")) Aruco.cornersSmoothFactor = float.Parse(split[1], any, invariantCulture);
+                else if (split[0].Equals("refineSearch")) Tag.refineSearch = split[1].Equals("true");
+                else if (split[0].Equals("refineIterations")) Tag.refineIterations = int.Parse(split[1]);
+                else if (split[0].Equals("tagsToCalibrate")) {
                     string[] tags = split[1].Split(',');
                     Tag.tagToCalibrate = new int[tags.Length];
                     for (int j = 0; j < tags.Length; j++) {
@@ -465,9 +626,30 @@ namespace TrackingSmoothing {
                     for (int j = 0; j < tags.Length; j++) {
                         Tag.tagsOnFloor[j] = int.Parse(tags[j]);
                     }
+                } else if (split[0].Equals("totalCameras")) {
+                    Tag.cameras = new Tag.Camera[int.Parse(split[1])];
+                    for (int j = 0; j < Tag.cameras.Length; j++) {
+                        Tag.cameras[j] = new Tag.Camera(new Matrix4x4(
+                            -0.611f, 0.489f, -0.623f, -0.369f,
+                            0.790f, 0.324f, -0.520f, 0.026f,
+                            -0.053f, -0.81f, -0.584f, 2.268f,
+                            0.0f, 0.0f, 0.0f, 1.0f), 1f, 1f);
+                    }
                 } else if (split[0].Contains("camera")) {
-                    for (int j = 0; j < 2; j++) {
-                        if (split[0].Equals($"camera{j}Quality")) { if (Tag.cameras.Length > j) { Tag.cameras[j].quality = float.Parse(split[1], any, invariantCulture); } } else if (split[0].Equals($"camera{j}File")) { if (Tag.cameras.Length > j) { Tag.cameras[j].file = split[1]; } } else if (split[0].Equals($"camera{j}Width")) { if (Tag.cameras.Length > j) { Tag.cameras[j].width = int.Parse(split[1]); } } else if (split[0].Equals($"camera{j}Height")) { if (Tag.cameras.Length > j) { Tag.cameras[j].height = int.Parse(split[1]); } } else if (split[0].Equals($"camera{j}Index")) { if (Tag.cameras.Length > j) { Tag.cameras[j].index = int.Parse(split[1]); } } else if (split[0].Equals($"camera{j}WorldResize")) { if (Tag.cameras.Length > j) { Tag.cameras[j].depthMult = float.Parse(split[1], any, invariantCulture); } }
+                    for (int j = 0; j < Tag.cameras.Length; j++) {
+                        if (split[0].Equals($"camera{j}Quality")) {
+                            Tag.cameras[j].quality = float.Parse(split[1], any, invariantCulture);
+                        } else if (split[0].Equals($"camera{j}File")) {
+                            Tag.cameras[j].file = split[1];
+                        } else if (split[0].Equals($"camera{j}Width")) {
+                            Tag.cameras[j].width = int.Parse(split[1]);
+                        } else if (split[0].Equals($"camera{j}Height")) {
+                            Tag.cameras[j].height = int.Parse(split[1]);
+                        } else if (split[0].Equals($"camera{j}Index")) {
+                            Tag.cameras[j].index = int.Parse(split[1]);
+                        } else if (split[0].Equals($"camera{j}WorldResize")) {
+                            Tag.cameras[j].depthMult = float.Parse(split[1], any, invariantCulture);
+                        }
                     }
                 }
 
