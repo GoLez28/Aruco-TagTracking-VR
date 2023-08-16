@@ -17,6 +17,11 @@ namespace TrackingSmoothing {
 
             public Vector3 fpos;
             public Quaternion frot;
+            public Vector3 pfpos;
+            public Quaternion pfrot;
+            public float pVel;
+            public float rVel;
+            public float velScore;
 
             public OneEuroFilter<Vector3> smoothedPos = new OneEuroFilter<Vector3>(2); //w 25
             public OneEuroFilter<Quaternion> smoothedRot = new OneEuroFilter<Quaternion>(5); //w 150
@@ -41,6 +46,9 @@ namespace TrackingSmoothing {
                     frot = rot;
                     return;
                 }
+                pfpos = fpos;
+                pfrot = frot;
+
                 //frot = Quaternion.Lerp(smoothPrevRot, frot, 0.5f);
                 if (!float.IsNaN(rot.X)) {
                     Quaternion frotf = smoothedRot.Filter(Quaternion.Normalize(rot));
@@ -48,7 +56,8 @@ namespace TrackingSmoothing {
                     if (float.IsNaN(smoothPrevRot.X))
                         smoothPrevRot = rot;
                     float dot = Math.Abs(Quaternion.Dot(rot, frotf));
-                    float end = (float)Math.Pow(dot / 1.5f, Program.postNoise == 2 ? 2 : 3);
+                    float sqrtFreq = (float)Math.Sqrt(smoothedRot.freq);
+                    float end = (float)Math.Pow(dot / 1.5f, sqrtFreq);
                     frot = Quaternion.Slerp(smoothPrevRot, rot, end);
                 }
                 if (!float.IsNaN(pos.X))
@@ -72,6 +81,16 @@ namespace TrackingSmoothing {
                 smoothPrevRot = Quaternion.Lerp(smoothPrevRot, frot, smoothinessRot);
                 smoothPrevRot = Quaternion.Normalize(smoothPrevRot);
                 frot = smoothPrevRot;
+
+                if (dynamicFiltering) {
+                    pVel = (fpos - pfpos).Length();
+                    rVel = (1f - Quaternion.Dot(frot, pfrot)) * 7f;
+                    velScore += rVel;
+                    velScore += pVel * 0.6f;
+                    velScore -= 0.015f;
+                    if (velScore < 0) velScore = 0;
+                    else if (velScore > 1) velScore = 1;
+                }
             }
         }
         public class RecieveTag {
@@ -183,9 +202,10 @@ namespace TrackingSmoothing {
         public static bool addNewRaw = false;
         public static long lastTimeGetRaw = 0;
         public static bool timedSnapshot = false;
+        public static bool dynamicFiltering = true;
         public static void SaveMatrix() {
             Console.WriteLine("Saving...");
-            for (int i = 0; i < 2; i++) {
+            for (int i = 0; i < cameras.Length; i++) {
                 using (StreamWriter sw = new StreamWriter("camMat" + i)) {
                     sw.WriteLine(cameras[i].matrix.M11);
                     sw.WriteLine(cameras[i].matrix.M12);
@@ -207,7 +227,7 @@ namespace TrackingSmoothing {
             }
         }
         public static void ReadMatrix() {
-            for (int i = 0; i < 2; i++) {
+            for (int i = 0; i < cameras.Length; i++) {
                 if (!File.Exists("camMat" + i)) continue;
                 string[] lines = File.ReadAllLines("camMat" + i);
                 int l = 0;
@@ -294,21 +314,22 @@ namespace TrackingSmoothing {
                 trackerss.Add(currentTracker);
             }
             trackers = trackerss.ToArray();
-            SetFinalTrackers(Program.postNoise == 2);
+            SetFinalTrackers(Program.postNoise == 2 ? 0.5f : 1f);
         }
-        public static void SetFinalTrackers(bool quarter) {
+        public static void SetFinalTrackers(float mult = 1f) {
             finals = new FinalTracker[trackers.Length];
-            float mult = 1f;
-            if (quarter) mult = 0.25f;
             for (int j = 0; j < trackers.Length; j++) {
                 finals[j] = new(new(), new(), new(), trackers[j].trackerName);
-                finals[j].avgSmoothAlwaysVal = (float)Math.Pow(trackers[j].avgSmoothAlwaysVal, mult);
-                finals[j].avgSmoothVal = (float)Math.Pow(trackers[j].avgSmoothVal, mult);
-                finals[j].avgSmoothRecoverVal = (float)Math.Pow(trackers[j].avgSmoothRecoverVal, mult);
-                finals[j].avgSmoothDistTrigger = trackers[j].avgSmoothDistTrigger * mult;
-                finals[j].smoothedRot.UpdateParams(trackers[j].smoothedRot * mult);
-                finals[j].smoothedPos.UpdateParams(trackers[j].smoothedPos * mult);
+                UpdateFinalTrackerParams(j, mult);
             }
+        }
+        public static void UpdateFinalTrackerParams(int id, float mult = 1f) {
+            finals[id].avgSmoothAlwaysVal = (float)Math.Pow(trackers[id].avgSmoothAlwaysVal, mult);
+            finals[id].avgSmoothVal = (float)Math.Pow(trackers[id].avgSmoothVal, mult);
+            finals[id].avgSmoothRecoverVal = (float)Math.Pow(trackers[id].avgSmoothRecoverVal, mult);
+            finals[id].avgSmoothDistTrigger = trackers[id].avgSmoothDistTrigger * mult;
+            finals[id].smoothedRot.UpdateParams(trackers[id].smoothedRot * mult);
+            finals[id].smoothedPos.UpdateParams(trackers[id].smoothedPos * mult);
         }
         public static List<RecieveTag> tagsList = new List<RecieveTag>();
         public static void RecieveTrackerAsync(int index, int camera, Matrix4x4 rot, Vector3 pos, int altRot) {
@@ -332,7 +353,7 @@ namespace TrackingSmoothing {
 
             if (getRawTrackersStep > -1) {
                 if (timedSnapshot) {
-                    if (Program.timer.ElapsedMilliseconds - lastTimeGetRaw > 1000) {
+                    if (Program.timer.ElapsedMilliseconds - lastTimeGetRaw > 3000) {
                         addNewRaw = true;
                         lastTimeGetRaw = Program.timer.ElapsedMilliseconds;
                     }
@@ -383,8 +404,9 @@ namespace TrackingSmoothing {
             for (int i = 0; i < combinedTrackers.Count; i++) {
                 CombinedTracker tracker = combinedTrackers[i];
                 Matrix4x4[] poss = tracker.Obtain();
-                Program.oscClientDebug.Send($"/debug/trackers/position", i, 0, poss[0].Translation.X, poss[0].Translation.Z, poss[0].Translation.Y);
-                Program.oscClientDebug.Send($"/debug/trackers/position", i, 1, poss[1].Translation.X, poss[1].Translation.Z, poss[1].Translation.Y);
+                for (int j = 0; j < poss.Length; j++) {
+                    Program.oscClientDebug.Send($"/debug/trackers/position", i, j, poss[j].Translation.X, poss[j].Translation.Z, poss[j].Translation.Y);
+                }
             }
         }
 
@@ -510,74 +532,77 @@ namespace TrackingSmoothing {
         }
 
         private static void RefineSearch() {
-            Console.WriteLine($"Refining Matrix with {refineIterations} iterations");
-            Matrix4x4 trueMat = cameras[0].matrix;
-            float pdist = 0;
-            for (int k = 0; k < refineIterations; k++) {
-                float[] vals = new float[] {trueMat.M11, trueMat.M12, trueMat.M13, trueMat.M14, trueMat.M21, trueMat.M22, trueMat.M23, trueMat.M24,
+            if (cameras.Length < 2) {
+                Console.WriteLine("Not sufficient cameras to refine matrix");
+                return;
+            }
+            for (int c = 0; c < cameras.Length; c++) {
+                if (c == 1) continue;
+                Console.WriteLine($"Refining camera:{c} Matrix with {refineIterations} iterations");
+                Matrix4x4 trueMat = cameras[c].matrix;
+                float pdist = 0;
+                for (int k = 0; k < refineIterations; k++) {
+                    float[] vals = new float[] {trueMat.M11, trueMat.M12, trueMat.M13, trueMat.M14, trueMat.M21, trueMat.M22, trueMat.M23, trueMat.M24,
                                 trueMat.M31, trueMat.M32, trueMat.M33, trueMat.M34, trueMat.M41, trueMat.M42, trueMat.M43, trueMat.M44};
-                float mult = (float)((((refineIterations - 1) * 1.25f) - k) / (float)((refineIterations - 1) * 1.25f));
-                float span = 0.25f * mult;
-                float step = 0.01f * mult;
-                float mini = 0;
-                float score = 1000f;
-                Console.Write($"{k}, ({span:0.000}/{step:0.0000}) s: ");
-                for (int j = 0; j < vals.Length; j++) {
-                    Console.Write(j + ", ");
-                    if (j == 3 || j == 7 || j >= 11) continue; //those dont move //3, 7, 11, 12, 13, 14, 15
-                    vals = new float[] {trueMat.M11, trueMat.M12, trueMat.M13, trueMat.M14, trueMat.M21, trueMat.M22, trueMat.M23, trueMat.M24,
+                    float mult = (float)((((refineIterations - 1) * 1.25f) - k) / (float)((refineIterations - 1) * 1.25f));
+                    float span = 0.10f * mult;
+                    float step = 0.005f * mult;
+                    float mini = 0;
+                    float score = 1000f;
+                    Console.Write($"{k}, ({span:0.000}/{step:0.0000}) s: ");
+                    for (int j = 0; j < vals.Length; j++) {
+                        Console.Write(j + ", ");
+                        if (j == 3 || j == 7 || j >= 11) continue; //those dont move //3, 7, 11, 12, 13, 14, 15
+                        vals = new float[] {trueMat.M11, trueMat.M12, trueMat.M13, trueMat.M14, trueMat.M21, trueMat.M22, trueMat.M23, trueMat.M24,
                                 trueMat.M31, trueMat.M32, trueMat.M33, trueMat.M34, trueMat.M41, trueMat.M42, trueMat.M43, trueMat.M44};
-                    float save = vals[j];
-                    for (float i = -span; i <= span; i += step) {
-                        vals[j] = save + i;
-                        ApplyRefinedMatrix(vals);
-                        //SendTrackerOSC();
-                        //System.Threading.Thread.Sleep(100);
-                        float scr = GetDistanceFromEachTracker(0, cameras[0].matrix, cameras[1].matrix);
-                        if (scr < score) {
-                            score = scr;
-                            mini = i;
+                        float save = vals[j];
+                        for (float i = -span; i <= span; i += step) {
+                            vals[j] = save + i;
+                            ApplyRefinedMatrix(vals, c);
+                            //SendTrackerOSC();
+                            //System.Threading.Thread.Sleep(100);
+                            float scr = GetDistanceFromEachTracker(c, cameras[c].matrix, 1);
+                            if (scr < score) {
+                                score = scr;
+                                mini = i;
+                            }
+                        }
+                        vals[j] = save + mini;
+                        ApplyRefinedMatrix(vals, c);
+                        trueMat = cameras[c].matrix;
+                        if (Program.debugSendTrackerOSC) {
+                            SendSingleTrackersOSC();
+                            System.Threading.Thread.Sleep(50);
                         }
                     }
-                    vals[j] = save + mini;
-                    ApplyRefinedMatrix(vals);
-                    trueMat = cameras[0].matrix;
+                    Console.WriteLine();
+                    float dist = GetDistanceFromEachTracker(c, cameras[c].matrix, 1);
+                    if (pdist == dist) {
+                        Console.WriteLine("Pretty close already");
+                        break;
+                    }
+                    pdist = dist;
                     if (Program.debugSendTrackerOSC) {
                         SendSingleTrackersOSC();
                         System.Threading.Thread.Sleep(50);
                     }
                 }
-                Console.WriteLine();
-                float dist = GetDistanceFromEachTracker(0, cameras[0].matrix, cameras[1].matrix);
-                if (pdist == dist) {
-                    Console.WriteLine("Pretty close already");
-                    break;
-                }
-                pdist = dist;
-                if (Program.debugSendTrackerOSC) {
-                    SendSingleTrackersOSC();
-                    System.Threading.Thread.Sleep(50);
-                }
             }
         }
 
-        static void ApplyRefinedMatrix(float[] vals) {
-            cameras[0].matrix = new Matrix4x4(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6], vals[7],
+        static void ApplyRefinedMatrix(float[] vals, int c) {
+            cameras[c].matrix = new Matrix4x4(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6], vals[7],
                                             vals[8], vals[9], vals[10], vals[11], vals[12], vals[13], vals[14], vals[15]);
             Matrix4x4[] cbt = combinedTrackers[0].Obtain();
-            Vector3 pos1 = cbt[0].Translation;
+            Vector3 pos1 = cbt[c].Translation;
             Vector3 pos2 = cbt[1].Translation;
             Vector3 diff = pos2 - pos1;
-            cameras[0].matrix = new Matrix4x4(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6], vals[7],
+            cameras[c].matrix = new Matrix4x4(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6], vals[7],
                 vals[8], vals[9], vals[10], vals[11], vals[12] + diff.X, vals[13] + diff.Y, vals[14] + diff.Z, vals[15]);
         }
 
         private static bool ApplyNewMatrix(int camera, Matrix4x4 rndMat, string message, bool raw = false) {
-            float score = 0;
-            if (camera == 0)
-                score = GetDistanceFromEachTracker(camera, rndMat, cameras[1].matrix);
-            else if (camera == 1)
-                score = GetDistanceFromEachTracker(camera, cameras[0].matrix, rndMat);
+            float score = GetDistanceFromEachTracker(camera, rndMat);
             float dist = score;
             score += GetDistanceFromZero(camera, rndMat) * 0.25f;
             if ((score < cameras[camera].minScore || raw) && !float.IsNaN(score)) {
@@ -590,15 +615,13 @@ namespace TrackingSmoothing {
             return false;
         }
 
-        private static float GetDistanceFromEachTracker(int camera, Matrix4x4 mat1, Matrix4x4 mat2, bool modDepth = true) {
+        private static float GetDistanceFromEachTracker(int camera, Matrix4x4 mat1, int against = -1) {
             float distSum = 0;
             float[] depthMul = new float[cameras.Length];
             for (int i = 0; i < cameras.Length; i++)
                 depthMul[i] = 1f;
-            if (modDepth) {
-                for (int i = 0; i < cameras.Length; i++)
-                    depthMul[i] = cameras[i].depthMult;
-            }
+            for (int i = 0; i < cameras.Length; i++)
+                depthMul[i] = cameras[i].depthMult;
             for (int i = 0; i < combinedTrackers.Count; i++) {
                 CombinedTracker tracker = combinedTrackers[i];
                 int id = tracker.index;
@@ -613,11 +636,16 @@ namespace TrackingSmoothing {
                 //}
                 //if (!found) continue;
                 if (tracker.singles.Length < 2) continue;
-                Vector3 pos1 = tracker.singles[0].pos * depthMul[0];
+                Vector3 pos1 = tracker.singles[camera].pos * depthMul[camera];
                 pos1 = Vector3.Transform(pos1, mat1);
-                for (int j = 1; j < cameras.Length; j++) {
+                for (int j = 0; j < cameras.Length; j++) {
+                    //TODO: this may be broken
+                    if (j == camera) continue;
+                    if (against != -1) {
+                        if (against != j) continue;
+                    }
                     Vector3 pos2 = tracker.singles[j].pos * depthMul[j];
-                    pos2 = Vector3.Transform(pos2, mat2);
+                    pos2 = Vector3.Transform(pos2, cameras[j].matrix);
                     float dist = Utils.GetDistance(pos1.X, pos1.Y, pos1.Z, pos2.X, pos2.Y, pos2.Z);
                     dist *= weight;
                     distSum += dist;
@@ -740,7 +768,13 @@ namespace TrackingSmoothing {
             //                                -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
             //}
             //newInfo = false;
+            float noiseRed = Program.postNoise == 2 ? 0.5f : 1f;
             for (int i = 0; i < finals.Length; i++) {
+                float score = 1f - finals[i].velScore;
+                score = (score * 0.7f) + 0.3f;
+                score *= noiseRed;
+                if (dynamicFiltering)
+                    UpdateFinalTrackerParams(i, score);
                 Vector3 pos = finals[i].fpos;
                 Quaternion q = finals[i].frot;
                 if (Program.useVRChatOSCTrackers) {

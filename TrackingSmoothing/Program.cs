@@ -508,7 +508,7 @@ namespace TrackingSmoothing {
             } else if (key == ConsoleKey.N) {
                 postNoise++;
                 if (postNoise > 2) postNoise = 0;
-                Tag.SetFinalTrackers(postNoise == 2);
+                Tag.SetFinalTrackers(postNoise == 2 ? 0.5f : 1f);
                 Console.WriteLine($"Toggle post-pose noise reduction {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}");
             } else if (key == ConsoleKey.B) {
                 clusterRotationGuess++;
@@ -608,6 +608,7 @@ namespace TrackingSmoothing {
                 else if (split[0].Equals("cornersSmoothFactor")) Aruco.cornersSmoothFactor = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("refineSearch")) Tag.refineSearch = split[1].Equals("true");
                 else if (split[0].Equals("refineIterations")) Tag.refineIterations = int.Parse(split[1]);
+                else if (split[0].Equals("dynamicFiltering")) Tag.dynamicFiltering = split[1].Equals("true");
                 else if (split[0].Equals("tagsToCalibrate")) {
                     string[] tags = split[1].Split(',');
                     Tag.tagToCalibrate = new int[tags.Length];
@@ -652,8 +653,8 @@ namespace TrackingSmoothing {
                         }
                     }
                 }
-
             }
+            Tag.cameraTPS = new double[Tag.cameras.Length];
         }
     }
 }

@@ -95,16 +95,13 @@ namespace TrackingSmoothing {
                 }
 
                 //PRELOAD VARIABLES
-                for (int i = 0; i < trackers.Length * 2; i += 2) {
-                    int ix2 = i / 2;
-                    if (trackers[ix2].updateCount[0] == 0) {
-                        updateCount[i] = 0;
+                for (int i = 0; i < trackers.Length * cameras.Length; i += cameras.Length) {
+                    int ix2 = i / cameras.Length;
+                    for (int j = 0; j < cameras.Length; j++) {
+                        if (trackers[ix2].updateCount[j] == 0)
+                            updateCount[i + j] = 0;
+                        trackers[ix2].updateCount[j]++;
                     }
-                    trackers[ix2].updateCount[0]++;
-                    if (trackers[ix2].updateCount[1] == 0) {
-                        updateCount[i + 1] = 0;
-                    }
-                    trackers[ix2].updateCount[1]++;
                 }
                 int cams = cameras.Length;
                 Matrix4x4[] trackersMat, trackerRotationsMat, trackerOffsetsMat;
@@ -201,7 +198,7 @@ namespace TrackingSmoothing {
                                 bool next = false;
                                 do {
                                     getCorner[pointArr] += cInc;
-                                    next = Program.clusterRotationGuess == 1 && getCorner[pointArr] <= 3 && trackers[pointArr / 2].singles[pointArr % 2].repeatedRots[getCorner[pointArr]];
+                                    next = Program.clusterRotationGuess == 1 && getCorner[pointArr] <= 3 && trackers[pointArr / cameras.Length].singles[pointArr % cameras.Length].repeatedRots[getCorner[pointArr]];
                                 }
                                 while (next);
                             } else
@@ -214,21 +211,6 @@ namespace TrackingSmoothing {
                     if (endLoop) break;
                     getCornerEx = getCorner; //new int[] { getCorner[0], getCorner[0], getCorner[1], getCorner[1], getCorner[2], getCorner[2], getCorner[3], getCorner[3] };
                     bool hasRepeated = false;
-                //for (int i = 0; i < getCornerEx.Length; i++) {
-                //    int cam = cameras.Length;
-                //    int i2 = i / cam;
-                //    for (int j = 0; j < cam; j++) {
-                //        int id = getCornerEx[i];
-                //        id = id >= 4 ? -1 : id;
-                //        if (id != -1) {
-                //            if (trackers[i2].singles[j].repeatedRots[id]) {
-                //                hasRepeated = true;
-                //                goto breakRepeatedLoop;
-                //            }
-                //        }
-                //    }
-                //}
-                breakRepeatedLoop:
                     if (updateCount[arrEnd - pointer] < 2 || first) {
                         if (!hasRepeated) {
                             System.Diagnostics.Stopwatch persw = new();
@@ -248,7 +230,7 @@ namespace TrackingSmoothing {
                         do {
                             getCorner[arrEnd] += cInc;
                         }
-                        while (Program.clusterRotationGuess == 1 && getCorner[arrEnd] <= 3 && trackers[arrEnd / Tag.cameras.Length].singles[arrEnd % Tag.cameras.Length].repeatedRots[getCorner[arrEnd]]);
+                        while (Program.clusterRotationGuess == 1 && getCorner[arrEnd] <= 3 && trackers[arrEnd / cameras.Length].singles[arrEnd % cameras.Length].repeatedRots[getCorner[arrEnd]]);
                     } else {
                         getCorner[arrEnd] = 4;
                     }
@@ -297,13 +279,10 @@ namespace TrackingSmoothing {
                 if (Program.debugSendTrackerOSC) {
                     for (int i = 0; i < trackerIndex.Length; i++) {
                         int id = trackerIndex[i];
-                        if (updateCount[i * 2] > 3) {
-                            if (updateCount[i * 2 + 1] > 3) continue;
-                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 0, poss[i * 2 + 1].X, poss[i * 2 + 1].Z, poss[i * 2 + 1].Y);
-                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 1, estimatedPos0[i * 2 + 1].X, estimatedPos0[i * 2 + 1].Z, estimatedPos0[i * 2 + 1].Y);
-                        } else {
-                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 0, poss[i * 2].X, poss[i * 2].Z, poss[i * 2].Y);
-                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 1, estimatedPos0[i * 2].X, estimatedPos0[i * 2].Z, estimatedPos0[i * 2].Y);
+                        for (int j = 0; j < cameras.Length; j++) {
+                            if (updateCount[i * cameras.Length + j] > 3) continue;
+                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 0, poss[i * cameras.Length + j].X, poss[i * cameras.Length + j].Z, poss[i * cameras.Length + j].Y);
+                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 1, estimatedPos0[i * cameras.Length + j].X, estimatedPos0[i * cameras.Length + j].Z, estimatedPos0[i * cameras.Length + j].Y);
                         }
                     }
                 }
@@ -411,17 +390,19 @@ namespace TrackingSmoothing {
                 trackerRotationsMat = new Matrix4x4[trackers.Length * cams];
                 trackerOffsetsMat = new Matrix4x4[trackers.Length * cams];
                 trackerStraightness = new float[trackers.Length * cams];
-                for (int i = 0; i < trackers.Length * 2; i += 2) {
-                    int ix2 = i / 2;
-                    Matrix4x4[] get = trackers[ix2].Obtain(altCorners[i], altCorners[i + 1]);
-                    trackersMat[i] = get[0];
-                    trackersMat[i + 1] = get[1];
-                    trackerStraightness[i] = trackers[ix2].trackerStraightness[0];
-                    trackerStraightness[i + 1] = trackers[ix2].trackerStraightness[1];
-                    trackerRotationsMat[i] = Matrix4x4.CreateFromAxisAngle(new Vector3(0, -1, 0), trackerRotations[ix2]);
-                    trackerRotationsMat[i + 1] = trackerRotationsMat[i];
-                    trackerOffsetsMat[i] = Matrix4x4.CreateTranslation(trackerOffsets[ix2]);
-                    trackerOffsetsMat[i + 1] = trackerOffsetsMat[i];
+                for (int i = 0; i < trackers.Length * cams; i += cams) {
+                    int ix2 = i / cams;
+                    int[] getCorners = new int[cams];
+                    for (int j = 0; j < cams; j++) {
+                        getCorners[j] = altCorners[i + j];
+                    }
+                    Matrix4x4[] get = trackers[ix2].Obtain(getCorners);
+                    for (int j = 0; j < cams; j++) {
+                        trackersMat[i + j] = get[j];
+                        trackerStraightness[i + j] = trackers[ix2].trackerStraightness[j];
+                        trackerRotationsMat[i + j] = Matrix4x4.CreateFromAxisAngle(new Vector3(0, -1, 0), trackerRotations[ix2]);
+                        trackerOffsetsMat[i + j] = Matrix4x4.CreateTranslation(trackerOffsets[ix2]);
+                    }
                 }
             }
 

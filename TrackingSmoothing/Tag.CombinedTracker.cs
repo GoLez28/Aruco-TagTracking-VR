@@ -192,26 +192,26 @@ namespace TrackingSmoothing {
                 //Console.WriteLine($"{mat.Translation.Z.ToString("0.00")} / {pos.Z.ToString("0.00")} / {r1.ToString("0.00")} ( {r2.ToString("0.00")} ) // {d.ToString("0.00")} / {singles[i].pos.Z.ToString("0.00")}");
                 //Console.WriteLine($"{pitch.ToString("0.00")} // {(singles[i].pos.Y / singles[i].pos.Z).ToString("0.00")} / {singles[i].pos.Y.ToString("0.00")} / {singles[i].pos.Z.ToString("0.00")}");
             }
-            public Matrix4x4[] Obtain(int altRot1 = -1, int altRot2 = -1) {
+            public Matrix4x4[] Obtain(int[] altRot = null) {
+                if (altRot == null) {
+                    altRot = new int[cameras.Length];
+                    for (int i = 0; i < cameras.Length; i++) {
+                        altRot[i] = -1;
+                    }
+                }
                 //COMBINE ROT MATRIX WITH POS VECTOR
-                float depth1 = singles[0].smooth_pos.Z;
-                float depth2 = singles[1].smooth_pos.Z;
-                Matrix4x4 rot1 = singles[0].rot;
-                Matrix4x4 rot2 = singles[1].rot;
-                if (altRot1 != -1 && altRot1 < 4) {
-                    rot1 = singles[0].altRots[altRot1];
+                float[] depth = new float[cameras.Length];
+                Matrix4x4[] rots = new Matrix4x4[cameras.Length];
+                Matrix4x4[] pos = new Matrix4x4[cameras.Length];
+                for (int i = 0; i < cameras.Length; i++) {
+                    depth[i] = singles[i].smooth_pos.Z;
+                    rots[i] = singles[i].rot;
+                    if (altRot[i] != -1 && altRot[i] < 4) {
+                        rots[i] = singles[i].altRots[altRot[i]];
+                    }
+                    pos[i] = Matrix4x4.Multiply(rots[i], Matrix4x4.CreateTranslation(singles[i].pos.X * cameras[i].depthMult, singles[i].pos.Y * cameras[i].depthMult, depth[i] * cameras[i].depthMult));
+                    pos[i] = Matrix4x4.Multiply(pos[i], cameras[i].matrix);
                 }
-                if (altRot2 != -1 && altRot2 < 4) {
-                    rot2 = singles[1].altRots[altRot2];
-                }
-                Matrix4x4[] pos = new Matrix4x4[] {
-                    Matrix4x4.Multiply(rot1, Matrix4x4.CreateTranslation(singles[0].pos.X * cameras[0].depthMult, singles[0].pos.Y * cameras[0].depthMult, depth1 * cameras[0].depthMult)),
-                    Matrix4x4.Multiply(rot2, Matrix4x4.CreateTranslation(singles[1].pos.X * cameras[1].depthMult, singles[1].pos.Y * cameras[1].depthMult, depth2 * cameras[1].depthMult))
-                };
-
-                //TRANSFORM WITH CAMERA MATRIX
-                pos[0] = Matrix4x4.Multiply(pos[0], cameras[0].matrix);
-                pos[1] = Matrix4x4.Multiply(pos[1], cameras[1].matrix);
                 return pos;
 
                 //-------------------!!!! UNUSED CODE AHEAD !!!!--------------------------------------

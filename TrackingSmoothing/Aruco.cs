@@ -56,6 +56,15 @@ namespace TrackingSmoothing {
         //static double[] byte2floatGamma = new double[256];
         //static byte[] float2byteGamma = new byte[256];
         public static void Init() {
+            queueCount = new int[Tag.cameras.Length];
+            sclQueue = new float[Tag.cameras.Length][];
+            posQueue = new VectorOfDouble[Tag.cameras.Length][];
+            rotQueue = new VectorOfDouble[Tag.cameras.Length][];
+            for (int i = 0; i < Tag.cameras.Length; i++) {
+                sclQueue[i] = new float[maxQueue];
+                posQueue[i] = new VectorOfDouble[maxQueue];
+                rotQueue[i] = new VectorOfDouble[maxQueue];
+            }
             betterRects = new RectEx[Tag.cameras.Length][];
             for (int i = 0; i < betterRects.Length; i++) {
                 betterRects[i] = new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() };
@@ -108,9 +117,13 @@ namespace TrackingSmoothing {
             //ArucoParameters.PolygonalApproxAccuracyRate = 0.1;
 
             // Calibration done with https://docs.opencv.org/3.4.3/d7/d21/tutorial_interactive_calibration.html
-            cameraMatrix = new Mat[] { new Mat(new Size(3, 3), DepthType.Cv32F, 1), new Mat(new Size(3, 3), DepthType.Cv32F, 1) };
-            distortionMatrix = new Mat[] { new Mat(1, 8, DepthType.Cv32F, 1), new Mat(1, 8, DepthType.Cv32F, 1) };
-            for (int c = 0; c < 2; c++) {
+            cameraMatrix = new Mat[Tag.cameras.Length];
+            distortionMatrix = new Mat[Tag.cameras.Length];
+            for (int i = 0; i < Tag.cameras.Length; i++) {
+                cameraMatrix[i] = new Mat(new Size(3, 3), DepthType.Cv32F, 1);
+                distortionMatrix[i] = new Mat(1, 8, DepthType.Cv32F, 1);
+            }
+            for (int c = 0; c < Tag.cameras.Length; c++) {
                 string cameraConfigurationFile = "cameraParameters" + (c + 1) + ".xml";
                 if (!Tag.cameras[c].file.Equals(""))
                     cameraConfigurationFile = Tag.cameras[c].file;
@@ -205,7 +218,7 @@ namespace TrackingSmoothing {
                         //get first position to not mess with the others
                         Mat rvecs = new Mat(); // rotation vector
                         Mat tvecs = new Mat(); // translation vector
-                        ArucoInvoke.EstimatePoseSingleMarkers(corners, markersLength, cameraMatrix[c], distortionMatrix[c], rvecs, tvecs);
+                        ArucoInvoke.EstimatePoseSingleMarkers(corners, markersLength, cameraMatrix[c], distortionMatrix[c], rvecs, tvecs);;
                         SendDetectedRect(c, frame, ids, corners, -1, tvecs);
 
                         skew = SkewRects(c, ids, corners, 0, -1);
@@ -223,10 +236,10 @@ namespace TrackingSmoothing {
                         if (posQueue[c][i] == null || rotQueue[c][i] == null) continue;
                         if (posQueue[c][i][2] == 0) continue;
                         try {
-                            if (!Program.debugSendTrackerOSC || true)
+                            if (!Program.debugSendTrackerOSC)
                                 ArucoInvoke.DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rotQueue[c][i], posQueue[c][i], markersLength * 0.5f * sclQueue[c][i]);
                         } catch {
-                            //Console.WriteLine("lol");
+                            Console.WriteLine("lol");
                         }
                     }
                     //---------------------
@@ -273,7 +286,7 @@ namespace TrackingSmoothing {
                         //Console.WriteLine($"{c} - {i} = {pos.X}\t{pos.Y}\t{pos.Z}");
                         pos.Y -= 0.1f;
                         Matrix4x4 finalMat = Matrix4x4.Multiply(rot, Matrix4x4.CreateTranslation(pos));
-                        if (Program.debugSendTrackerOSC && altCorner == -1 && false)
+                        if (Program.debugSendTrackerOSC && altCorner == -1)
                             ArucoInvoke.DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rvec, tvec, markersLength);
                     }
 
