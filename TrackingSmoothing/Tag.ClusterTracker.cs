@@ -100,7 +100,8 @@ namespace TrackingSmoothing {
                     for (int j = 0; j < cameras.Length; j++) {
                         if (trackers[ix2].updateCount[j] == 0)
                             updateCount[i + j] = 0;
-                        trackers[ix2].updateCount[j]++;
+                        if (cameras[j].newData)
+                            trackers[ix2].updateCount[j]++;
                     }
                 }
                 int cams = cameras.Length;
@@ -280,9 +281,10 @@ namespace TrackingSmoothing {
                     for (int i = 0; i < trackerIndex.Length; i++) {
                         int id = trackerIndex[i];
                         for (int j = 0; j < cameras.Length; j++) {
-                            if (updateCount[i * cameras.Length + j] > 3) continue;
-                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 0, poss[i * cameras.Length + j].X, poss[i * cameras.Length + j].Z, poss[i * cameras.Length + j].Y);
-                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 1, estimatedPos0[i * cameras.Length + j].X, estimatedPos0[i * cameras.Length + j].Z, estimatedPos0[i * cameras.Length + j].Y);
+                            int v = i * cameras.Length + j;
+                            if (updateCount[v] > 3) continue;
+                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 0, poss[v].X, poss[v].Z, poss[v].Y);
+                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 1, estimatedPos0[v].X, estimatedPos0[v].Z, estimatedPos0[v].Y);
                         }
                     }
                 }
@@ -685,6 +687,14 @@ namespace TrackingSmoothing {
                     rots[i] = mat.Rotation();
                     if (float.IsNaN(rots[i].X))
                         rots[i] = Quaternion.Identity;
+                    if (final) {
+                        if (Program.debugSendTrackerOSC && (updateCountCpy[i] < 2 || (i % cameras.Length == 0))) {
+                            Matrix4x4 dir = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-0.25f, 0, 0)), Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(rots[i]), Matrix4x4.CreateTranslation(poss[i])));
+                            Vector3 dirV = dir.Translation;
+                            int id = trackerIndex[i / cameras.Length];
+                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 2, dirV.X, dirV.Z, dirV.Y);
+                        }
+                    }
                     //Aruco.DrawAxis(Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(rots[i]), Matrix4x4.CreateTranslation(poss[i])));
                 }
             }

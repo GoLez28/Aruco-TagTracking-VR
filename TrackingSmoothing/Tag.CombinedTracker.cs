@@ -12,12 +12,14 @@ namespace TrackingSmoothing {
             public int[] trackerPresence = new int[2];
             public float[] trackerStraightness = new float[2]; //higher is better
             public float trackerStraightnessMax = 0.2f;
+            public bool[] newData = new bool[2];
             public int index = 0;
             public CombinedTracker(int index) {
                 this.index = index;
                 trackerStraightness = new float[cameras.Length];
                 trackerPresence = new int[cameras.Length];
                 updateCount = new int[cameras.Length];
+                newData = new bool[cameras.Length];
                 singles = new SingleTracker[cameras.Length];
                 for (int i = 0; i < singles.Length; i++) {
                     singles[i] = new SingleTracker();
@@ -154,11 +156,12 @@ namespace TrackingSmoothing {
                     singles[camera].smooth_pos = pos;
 
                 trackerPresence[camera]++;
-                if (trackerPresence[camera] > 10) {
-                    trackerPresence[camera] = 10;
+                if (trackerPresence[camera] > 5) {
+                    trackerPresence[camera] = 5;
                 }
                 //RESET UPDATE
                 updateCount[camera] = 0;
+                newData[camera] = true;
 
                 //CHECK FOR ROTATION STARIGHTNESS
                 //i dont remember what is this for lol

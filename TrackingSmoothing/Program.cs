@@ -489,6 +489,8 @@ namespace TrackingSmoothing {
                 ReadConfig();
                 Tag.ReadTrackers();
                 Console.WriteLine($"Reloaded Config / Trackers");
+                ApplyOffset();
+                LoadOffsets();
             } else if (key == ConsoleKey.D5) {
                 autoOffset = !autoOffset;
                 Console.WriteLine($"Auto Adjust Offset");
@@ -581,6 +583,7 @@ namespace TrackingSmoothing {
             if (!File.Exists("config.txt")) return;
             string[] lines = File.ReadAllLines("config.txt");
             for (int i = 0; i < lines.Length; i++) {
+                if (lines[i][0] == ';') continue;
                 string[] split = lines[i].Split("=");
                 System.Globalization.NumberStyles any = System.Globalization.NumberStyles.Any;
                 System.Globalization.CultureInfo invariantCulture = System.Globalization.CultureInfo.InvariantCulture;
@@ -646,6 +649,10 @@ namespace TrackingSmoothing {
                             Tag.cameras[j].width = int.Parse(split[1]);
                         } else if (split[0].Equals($"camera{j}Height")) {
                             Tag.cameras[j].height = int.Parse(split[1]);
+                        } else if (split[0].Equals($"camera{j}ResizeWidth")) {
+                            Tag.cameras[j].rsWidth = int.Parse(split[1]);
+                        } else if (split[0].Equals($"camera{j}ResizeHeight")) {
+                            Tag.cameras[j].rsHeight = int.Parse(split[1]);
                         } else if (split[0].Equals($"camera{j}Index")) {
                             Tag.cameras[j].index = int.Parse(split[1]);
                         } else if (split[0].Equals($"camera{j}WorldResize")) {

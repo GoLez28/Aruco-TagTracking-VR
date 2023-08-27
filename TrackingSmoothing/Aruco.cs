@@ -136,8 +136,11 @@ namespace TrackingSmoothing {
                 fs["dist_coeffs"].ReadMat(distortionMatrix[c]);
             }
         }
+        static float smoothbenchmark = 0;
         public static void Update(int c) {
+            int frameCount = 0;
             while (true) {
+                frameCount++;
                 if (Program.wantToCloseWindows) {
                     CvInvoke.DestroyAllWindows();
                     Program.wantToCloseWindows = false;
@@ -150,6 +153,53 @@ namespace TrackingSmoothing {
                 }
                 System.Diagnostics.Debug.WriteLine(c);
                 frame = capture[c].QueryFrame();
+                bool correctRes = Tag.cameras[c].rsHeight > 10 && Tag.cameras[c].rsWidth > 10;
+                if (correctRes) {
+                    int newWidth = Tag.cameras[c].rsWidth;
+                    int newHeight = Tag.cameras[c].rsHeight;
+                    System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+                    bool xb = frameCount % 2 == 0;
+                    bool yb = frameCount % 4 > 1;
+                    sw.Start();
+                    byte[] asd = frame.GetRawData();
+                    float mult = (float)newHeight / (float)frame.Height;
+                    byte[] dsds = new byte[newWidth * newHeight * 3];
+                    GCHandle pinnedArray = GCHandle.Alloc(dsds, GCHandleType.Pinned);
+                    IntPtr pointer = pinnedArray.AddrOfPinnedObject();
+                    int[] ptrx1 = new int[newWidth];
+                    int[] ptrx2 = new int[newWidth];
+                    int nw3 = newWidth * 3;
+                    int ow3 = frame.Width * 3;
+                    unsafe {
+                        fixed (byte* pntr = &dsds[0], pntr2 = &asd[0]) {
+                            for (int x = 0; x < newWidth; x++) {
+                                ptrx1[x] = x * 3;
+                                int x2 = xb ? (int)(x / mult) : (int)Math.Ceiling(x / mult);
+                                ptrx2[x] = x2 * 3;
+                            }
+                            for (int y = 0; y < newHeight; y++) {
+                                int y2 = yb ? (int)(y / mult) : (int)Math.Ceiling(y / mult);
+                                int ay1 = y * nw3;
+                                int ay2 = y2 * ow3;
+                                byte* c1 = pntr + ay1;
+                                byte* c2 = pntr2 + ay2;
+                                for (int x = 0; x < newWidth; x++) {
+                                    int* cc1 = (int*)(c1 + ptrx1[x]);
+                                    int* cc2 = (int*)(c2 + ptrx2[x]);
+                                    *cc1 = *cc2;
+                                }
+                            }
+                        }
+                    }
+
+                    frame = new Mat(newHeight, newWidth, DepthType.Cv8U, 3, pointer, 0);
+                    pinnedArray.Free();
+                    sw.Stop();
+                    if (c == 2) {
+                        smoothbenchmark += (sw.ElapsedMilliseconds - smoothbenchmark) * 0.01f;
+                        Console.WriteLine($"cam {c}: {smoothbenchmark}ms");
+                    }
+                }
                 //if (c == 0)
                 //    frame = new Mat(@"C:\Users\\Videos\iVCam\2023-08-01 222744.jpg");
                 //if (c == 1
@@ -218,7 +268,7 @@ namespace TrackingSmoothing {
                         //get first position to not mess with the others
                         Mat rvecs = new Mat(); // rotation vector
                         Mat tvecs = new Mat(); // translation vector
-                        ArucoInvoke.EstimatePoseSingleMarkers(corners, markersLength, cameraMatrix[c], distortionMatrix[c], rvecs, tvecs);;
+                        ArucoInvoke.EstimatePoseSingleMarkers(corners, markersLength, cameraMatrix[c], distortionMatrix[c], rvecs, tvecs);
                         SendDetectedRect(c, frame, ids, corners, -1, tvecs);
 
                         skew = SkewRects(c, ids, corners, 0, -1);
@@ -251,6 +301,7 @@ namespace TrackingSmoothing {
                     }
                     frame.Dispose();
                 }
+                Tag.cameras[c].newData = true;
                 Tag.newInfoReady = true;
             }
 
@@ -319,7 +370,7 @@ namespace TrackingSmoothing {
                             if (Math.Abs(lokd[j].X - curr[j].X) > cornersMaxDistance || Math.Abs(lokd[j].Y - curr[j].Y) > cornersMaxDistance)
                                 wrongs++;
                         }
-                        if (wrongs > 2) {
+                        if (wrongs > 1) {
                             betterRects[c][id].locked = false;
                         }
                     }

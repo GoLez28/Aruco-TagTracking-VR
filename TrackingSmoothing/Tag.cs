@@ -116,8 +116,11 @@ namespace TrackingSmoothing {
             public string file = "";
             public int width = 640;
             public int height = 480;
+            public int rsWidth = 0;
+            public int rsHeight = 0;
             public int index = 0;
             public bool useCustomDistortion = false;
+            public bool newData = false;
             public float[] customDist = new float[] {
                     1.075f, 1f, 1.075f,
                     1.025f, 0.975f, 1.025f,
@@ -360,6 +363,8 @@ namespace TrackingSmoothing {
                 }
                 bool ready = false;
                 int addCount = 0;
+                List<string> trackersName = new();
+                List<int> trackerId = new();
                 for (int i = 0; i < trackers.Length; i++) {
                     for (int j = 0; j < trackers[i].trackers.Length; j++) {
                         CombinedTracker cbt = trackers[i].trackers[j];
@@ -376,6 +381,16 @@ namespace TrackingSmoothing {
                         if (lessThan && addNewRaw) {
                             addCount++;
                             CombinedTracker cbt2 = new CombinedTracker(cbt.index);
+                            //search for name and id
+                            for (int k = 0; k < trackers.Length; k++) {
+                                for (int l = 0; l < trackers[k].trackerIndex.Length; l++) {
+                                    if (trackers[k].trackerIndex[l] == cbt2.index) {
+                                        trackersName.Add(trackers[k].trackerName);
+                                        trackerId.Add(cbt2.index);
+                                        break;
+                                    }
+                                }
+                            }
                             for (int k = 0; k < cbt.singles.Length; k++) {
                                 cbt2.Recieve(k, cbt.singles[k].pos, cbt.singles[k].rot, -1);
                             }
@@ -385,6 +400,9 @@ namespace TrackingSmoothing {
                 }
                 if (addNewRaw && addCount > 0) {
                     Console.WriteLine($"Added {addCount}, total: {combinedTrackers.Count}");
+                    for (int i = 0; i < trackersName.Count; i++) {
+                        Console.WriteLine($"\t{trackersName[i]}: {trackerId[i]}");
+                    }
                 }
                 addNewRaw = false;
                 if (ready && !newTrackersReady) {
@@ -722,6 +740,9 @@ namespace TrackingSmoothing {
                 //finals[i].pos = pos;
                 //finals[i].prot = finals[i].rot;
                 //finals[i].rot = q;
+            }
+            for (int i = 0; i < cameras.Length; i++) {
+                cameras[i].newData = false;
             }
             if (Program.timer.Elapsed.TotalSeconds > Program.nextSave) {
                 //Console.WriteLine(">> new tick: " + Program.nextSave);
