@@ -21,7 +21,7 @@ namespace TrackingSmoothing {
         public static string poseAdjustWaist = "waist";
         public static float poseAdjustLegDist = 0.5f;
 
-        public static bool preNoise = true;
+        public static int preNoise = 1;
         public static int postNoise = 1;
         public static int clusterRotationGuess = 1;
         public static bool ignoreNoisyRotation = true;
@@ -348,7 +348,7 @@ namespace TrackingSmoothing {
         static void ShowHint() {
             Console.WriteLine($"\n[D8] Reset Trackers (VMT)\n[Space] Show Hints\n[D1] Calibrate Cameras\n[D2] Manual Offset Adjust: {Show(adjustOffset)}" +
                 $"\n[D3] Reload Offsets\n[D4] Reloaded Config/Trackers\n[D5] Auto Adjust Offsets\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}\n[D9] Show Camera Windows\n[D0] Clear Console" +
-                $"\n[M] Pre-Pose Noise Reduction: {Show(preNoise)}\n[N] Post-Pose Noise Reduction: {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}" +
+                $"\n[M] Pre-Pose Noise Reduction: {(preNoise == 0 ? "Disabled" : preNoise == 1 ? "Enabled" : "Smooth rects off")}\n[N] Post-Pose Noise Reduction: {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}" +
                 $"\n[Q]-[W] X: {offset.X}\n[A]-[S] Y: {offset.Y}\n[Z]-[X] Z: {offset.Z}\n[E]-[R] Yaw: {rotationY}\n[D]-[F] xRot: {rotationX}\n[C]-[V] zRot: {rotationZ}");
             if (ovrNotFound) {
                 Console.ForegroundColor = ConsoleColor.Red;
@@ -505,8 +505,9 @@ namespace TrackingSmoothing {
                     Console.WriteLine($"Rotate offset manually {Show(isRotateKeyPressed)}");
                 }
             } else if (key == ConsoleKey.M) {
-                preNoise = !preNoise;
-                Console.WriteLine($"Toggle pre-pose noise reduction {Show(preNoise)}");
+                preNoise++;
+                if (preNoise > 2) preNoise = 0;
+                Console.WriteLine($"Toggle pre-pose noise reduction {(preNoise == 0 ? "Disabled" : preNoise == 1 ? "Enabled" : "Smooth rects off")}");
             } else if (key == ConsoleKey.N) {
                 postNoise++;
                 if (postNoise > 2) postNoise = 0;
@@ -594,7 +595,7 @@ namespace TrackingSmoothing {
                 else if (split[0].Equals("poseAdjustPanAngleRight")) Tag.panAngleR = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("poseAdjustPanAngleLeft")) Tag.panAngleL = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("poseAdjustWaist")) poseAdjustWaist = split[1];
-                else if (split[0].Equals("preNoiseReduction")) preNoise = split[1].Equals("true");
+                else if (split[0].Equals("preNoiseReduction")) preNoise = int.Parse(split[1]);
                 else if (split[0].Equals("postNoiseReduction")) postNoise = int.Parse(split[1]);
                 else if (split[0].Equals("enableIgnoreNoisyRotation")) ignoreNoisyRotation = split[1].Equals("true");
                 else if (split[0].Equals("oscAddress")) oscAddress = split[1];

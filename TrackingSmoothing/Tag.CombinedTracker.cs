@@ -52,7 +52,7 @@ namespace TrackingSmoothing {
                         else r1ListAlt.Add(curRot);
                         lastRot1Alt = curRot;
                     }
-                    if (r1ListAlt.Count < r2ListAlt.Count && Program.preNoise) {
+                    if (r1ListAlt.Count < r2ListAlt.Count && Program.preNoise != 0) {
                         rot = Matrix4x4.CreateFromQuaternion(r2ListAlt[0]);
                     }
                     singles[camera].altRots[altRot] = rot;
@@ -88,7 +88,7 @@ namespace TrackingSmoothing {
                         d2List.Add(currentDepth);
                     }
                 }
-                if (d1List.Count < d2List.Count && Program.preNoise) {
+                if (d1List.Count < d2List.Count && Program.preNoise != 0) {
                     pos.Z = d2List[0];
                 }
 
@@ -126,7 +126,7 @@ namespace TrackingSmoothing {
                     lastRot1 = curRot;
                 }
                 singles[camera].consistentRot = false;
-                if (r1List.Count < r2List.Count && Program.preNoise) {
+                if (r1List.Count < r2List.Count && Program.preNoise != 0) {
                     rot = Matrix4x4.CreateFromQuaternion(r2List[0]);
                     if (r2List.Count > 7) singles[camera].consistentRot = true;
                 } else {
@@ -152,7 +152,7 @@ namespace TrackingSmoothing {
                     }
                 }
                 singles[camera].smooth_pos = singles[camera].filter_pos.Filter(pos);
-                if (!Program.preNoise)
+                if (Program.preNoise == 0)
                     singles[camera].smooth_pos = pos;
 
                 trackerPresence[camera]++;

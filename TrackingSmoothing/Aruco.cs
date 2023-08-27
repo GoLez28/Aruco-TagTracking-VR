@@ -250,7 +250,7 @@ namespace TrackingSmoothing {
 
                     //smooth corners
                     try {
-                        if (Program.preNoise) {
+                        if (Program.preNoise == 1) {
                             corners = SmoothCorners(c, ids, corners);
                         }
                     } catch (Exception e) {
