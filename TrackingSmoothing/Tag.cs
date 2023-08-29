@@ -181,6 +181,9 @@ namespace TrackingSmoothing {
                 )
         };
         public static List<CombinedTracker> combinedTrackers = new();
+        public static CombinedTracker[] rawTrackers = new CombinedTracker[] {
+            new(0), new(1), new(2), new(3), new(4), new(5), new(6), new(7), new(8), new(9), new(10), new(11), new(12), new(13), new(14), new(15)
+        };
         public static int[] tagToCalibrate = new int[] { 0, 2, 4, 6 };
         public static int[] tagsOnFloor = new int[] { 0, 2, 4, 6 };
         public static float[] tagToCalibrateWeight = new float[] { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
@@ -344,14 +347,28 @@ namespace TrackingSmoothing {
             tagsList = new List<RecieveTag>();
             newInfoReady = false;
             if (Program.debugSendTrackerOSC)
-                Program.oscClient.Send($"/debug/tick", 0);
+                Program.oscClientDebug.Send($"/debug/tick", 0);
             for (int i = 0; i < tagsListCopy.Count; i++) {
                 RecieveTag tag = tagsListCopy[i];
                 if (tag != null) {
                     RecieveTracker(tag.index, tag.camera, tag.rot, tag.pos, tag.altRot);
                 }
             }
-            SendSingleTrackersOSC();
+            if (Program.debugSendTrackerOSC) {
+                if (Program.timer.ElapsedMilliseconds - saveMatTime < 15000) {
+                    SendSingleTrackersOSC();
+                } else {
+                    for (int i = 0; i < rawTrackers.Length; i++) {
+                        CombinedTracker tracker = rawTrackers[i];
+                        Matrix4x4[] poss = tracker.Obtain();
+                        for (int j = 0; j < poss.Length; j++) {
+                            if (rawTrackers[i].updateCount[j] > 2) continue;
+                            rawTrackers[i].updateCount[j]++;
+                            Program.oscClientDebug.Send($"/debug/trackers/position", i, j, poss[j].Translation.X, poss[j].Translation.Z, poss[j].Translation.Y);
+                        }
+                    }
+                }
+            }
             newInfo = true;
 
             if (getRawTrackersStep > -1) {
@@ -473,16 +490,16 @@ namespace TrackingSmoothing {
             }
             lastCamera = camera;
             lastIndex = index;
-            //if (altRot == -1) {
-            //    for (int k = 0; k < combinedTrackers.Length; k++) {
-            //        if (combinedTrackers[k].index == index) {
-            //            combinedTrackers[k].Recieve(camera, pos, rot, -1);
-            //            break;
-            //        }
-            //    }
-            //}
+            if (altRot == -1) {
+                for (int k = 0; k < rawTrackers.Length; k++) {
+                    if (rawTrackers[k].index == index) {
+                        rawTrackers[k].Recieve(camera, pos, rot, -1);
+                        break;
+                    }
+                }
+            }
             if (index == 0 && altRot == -1)
-                if (Program.timer.ElapsedMilliseconds - saveMatTime < 20000) {
+                if (Program.timer.ElapsedMilliseconds - saveMatTime < 15000) {
                     Vector3 vec = pos * cameras[camera].depthMult;
                     Matrix4x4 vecMat = Matrix4x4.CreateTranslation(vec);
                     Matrix4x4 newMat = Matrix4x4.Multiply(rot, vecMat);
