@@ -362,8 +362,9 @@ namespace TrackingSmoothing {
                         CombinedTracker tracker = rawTrackers[i];
                         Matrix4x4[] poss = tracker.Obtain();
                         for (int j = 0; j < poss.Length; j++) {
-                            if (rawTrackers[i].updateCount[j] > 2) continue;
+                            if (cameras[j].newData)
                             rawTrackers[i].updateCount[j]++;
+                            if (rawTrackers[i].updateCount[j] > 2) continue;
                             Program.oscClientDebug.Send($"/debug/trackers/position", i, j, poss[j].Translation.X, poss[j].Translation.Z, poss[j].Translation.Y);
                         }
                     }
