@@ -51,6 +51,8 @@ namespace TrackingSmoothing {
 
                 //frot = Quaternion.Lerp(smoothPrevRot, frot, 0.5f);
                 if (!float.IsNaN(rot.X)) {
+                    if (float.IsNaN(smoothedRot.currValue.X))
+                        smoothedRot = new OneEuroFilter<Quaternion>(smoothedRot.freq);
                     Quaternion frotf = smoothedRot.Filter(Quaternion.Normalize(rot));
 
                     if (float.IsNaN(smoothPrevRot.X))
@@ -321,11 +323,16 @@ namespace TrackingSmoothing {
             }
             trackers = trackerss.ToArray();
             SetFinalTrackers(Program.postNoise == 2 ? 0.5f : 1f);
+
+            combinedTrackers = new();
+            rawTrackers = new CombinedTracker[] {
+                new(0), new(1), new(2), new(3), new(4), new(5), new(6), new(7), new(8), new(9), new(10), new(11), new(12), new(13), new(14), new(15)
+            };
         }
         public static void SetFinalTrackers(float mult = 1f) {
             finals = new FinalTracker[trackers.Length];
             for (int j = 0; j < trackers.Length; j++) {
-                finals[j] = new(new(), new(), new(), trackers[j].trackerName);
+                finals[j] = new(new(), Quaternion.Identity, Quaternion.Identity, trackers[j].trackerName);
                 UpdateFinalTrackerParams(j, mult);
             }
         }
@@ -363,7 +370,7 @@ namespace TrackingSmoothing {
                         Matrix4x4[] poss = tracker.Obtain();
                         for (int j = 0; j < poss.Length; j++) {
                             if (cameras[j].newData)
-                            rawTrackers[i].updateCount[j]++;
+                                rawTrackers[i].updateCount[j]++;
                             if (rawTrackers[i].updateCount[j] > 2) continue;
                             Program.oscClientDebug.Send($"/debug/trackers/position", i, j, poss[j].Translation.X, poss[j].Translation.Z, poss[j].Translation.Y);
                         }
@@ -660,8 +667,6 @@ namespace TrackingSmoothing {
                 depthMul[i] = cameras[i].depthMult;
             for (int i = 0; i < combinedTrackers.Count; i++) {
                 CombinedTracker tracker = combinedTrackers[i];
-                int id = tracker.index;
-                bool found = false;
                 float weight = 1f;
                 //for (int j = 0; j < tagToCalibrate.Length; j++) {
                 //    if (id == tagToCalibrate[j]) {
@@ -894,7 +899,6 @@ namespace TrackingSmoothing {
                     continue; //dont adjust
                 }
 
-                float pi = (float)Math.PI;
                 //get rot
                 adjmr = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(finals[adjustables[i]].rot), waistInv);
                 //finals[adjustables[i]].rot = adjmr.Rotation();
