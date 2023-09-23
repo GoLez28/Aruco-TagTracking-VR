@@ -67,7 +67,10 @@ namespace TrackingSmoothing {
             }
             betterRects = new RectEx[Tag.cameras.Length][];
             for (int i = 0; i < betterRects.Length; i++) {
-                betterRects[i] = new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() };
+                betterRects[i] = new RectEx[36];
+                for (int j = 0; j < betterRects[i].Length; j++) {
+                    betterRects[i][j] = new();
+                }
             }
             capture = new VideoCapture[Tag.cameras.Length];
             //whiteLogo = new Bitmap(@"iVCam\black.jpg");
@@ -103,10 +106,10 @@ namespace TrackingSmoothing {
                 capture[i].Set(CapProp.FrameHeight, Tag.cameras[i].height);
             }
 
-            int markersX = 4;
-            int markersY = 4;
+            int markersX = 6;
+            int markersY = 6;
             int markersSeparation = 30;
-            ArucoDict = new Dictionary(16, 4/*Dictionary.PredefinedDictionaryName.Dict4X4_1000*/); // bits x bits (per marker) _ number of markers in dict
+            ArucoDict = new Dictionary(36, 4/*Dictionary.PredefinedDictionaryName.Dict4X4_1000*/); // bits x bits (per marker) _ number of markers in dict
             //ArucoDict = new Dictionary(false);
             GridBoard ArucoBoard = null;
             ArucoBoard = new GridBoard(markersX, markersY, markersLength, markersSeparation, ArucoDict);
@@ -406,8 +409,8 @@ namespace TrackingSmoothing {
                 rects[i][c1].Y = rects[i][c1].Y * 0.95f + center.Y * 0.05f;
                 int[] inv = new int[] { 2, 3, 0, 1 };
                 int ic1 = inv[c1];
-                rects[i][ic1].X = rects[i][ic1].X + (rects[i][ic1].X - center.X) * 0.1f;
-                rects[i][ic1].Y = rects[i][ic1].Y + (rects[i][ic1].Y - center.Y) * 0.1f;
+                rects[i][ic1].X = rects[i][ic1].X + (rects[i][ic1].X - center.X) * 0.08f;
+                rects[i][ic1].Y = rects[i][ic1].Y + (rects[i][ic1].Y - center.Y) * 0.08f;
                 if (c2 == -1) continue;
                 rects[i][c2].X = rects[i][c2].X * 0.95f - center.X * 0.05f;
                 rects[i][c2].Y = rects[i][c2].Y * 0.95f - center.Y * 0.05f;
