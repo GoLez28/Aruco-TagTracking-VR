@@ -326,9 +326,10 @@ namespace TrackingSmoothing {
             SetFinalTrackers(Program.postNoise == 2 ? 0.5f : 1f);
 
             combinedTrackers = new();
-            rawTrackers = new CombinedTracker[] {
-                new(0), new(1), new(2), new(3), new(4), new(5), new(6), new(7), new(8), new(9), new(10), new(11), new(12), new(13), new(14), new(15)
-            };
+            rawTrackers = new CombinedTracker[36];
+            for (int j = 0; j < rawTrackers.Length; j++) {
+                rawTrackers[i] = new(j);
+            }
         }
         public static void SetFinalTrackers(float mult = 1f) {
             finals = new FinalTracker[trackers.Length];
