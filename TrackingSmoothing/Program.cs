@@ -658,6 +658,8 @@ namespace TrackingSmoothing {
                             Tag.cameras[j].index = int.Parse(split[1]);
                         } else if (split[0].Equals($"camera{j}WorldResize")) {
                             Tag.cameras[j].depthMult = float.Parse(split[1], any, invariantCulture);
+                        } else if (split[0].Equals($"camera{j}Brightness")) {
+                            Tag.cameras[j].brightness = float.Parse(split[1], any, invariantCulture);
                         }
                     }
                 }

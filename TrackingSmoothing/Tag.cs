@@ -123,6 +123,7 @@ namespace TrackingSmoothing {
             public int index = 0;
             public bool useCustomDistortion = false;
             public bool newData = false;
+            public float brightness = 1f;
             public float[] customDist = new float[] {
                     1.075f, 1f, 1.075f,
                     1.025f, 0.975f, 1.025f,

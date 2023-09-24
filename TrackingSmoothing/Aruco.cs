@@ -198,10 +198,21 @@ namespace TrackingSmoothing {
                     frame = new Mat(newHeight, newWidth, DepthType.Cv8U, 3, pointer, 0);
                     pinnedArray.Free();
                     sw.Stop();
-                    if (c == 2) {
-                        smoothbenchmark += (sw.ElapsedMilliseconds - smoothbenchmark) * 0.01f;
-                        Console.WriteLine($"cam {c}: {smoothbenchmark}ms");
-                    }
+                    //if (c == 2) {
+                    //    smoothbenchmark += (sw.ElapsedMilliseconds - smoothbenchmark) * 0.01f;
+                    //    Console.WriteLine($"cam {c}: {smoothbenchmark}ms");
+                    //}
+                }
+                bool adjustBrightness = Tag.cameras[c].brightness != 1f;
+                if (adjustBrightness) {
+                    System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+                    sw.Start();
+                    frame *= Tag.cameras[c].brightness;
+                    sw.Stop();
+                    //if (c == 2) {
+                    //    smoothbenchmark += (sw.ElapsedMilliseconds - smoothbenchmark) * 0.1f;
+                    //    Console.WriteLine($"cam {c}: {smoothbenchmark}ms");
+                    //}
                 }
                 //if (c == 0)
                 //    frame = new Mat(@"C:\Users\\Videos\iVCam\2023-08-01 222744.jpg");
@@ -263,7 +274,7 @@ namespace TrackingSmoothing {
                     if (ids.Size > 0) {
                         //Draw detected markers
                         VectorOfVectorOfPointF skew;
-                        //skew = SkewRects(c, ids, corners, 2, -1);
+                        //corners = SkewRects(c, ids, corners, 2, -1);
                         if (shouldShowFrame)
                             ArucoInvoke.DrawDetectedMarkers(frame, corners, ids, new MCvScalar(255, 0, 255));
 

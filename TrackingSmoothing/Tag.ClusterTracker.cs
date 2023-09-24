@@ -126,26 +126,36 @@ namespace TrackingSmoothing {
                 for (int i = 0; i < trackers.Length; i++) {
                     for (int j = 0; j < trackers[i].singles.Length; j++) {
                         if (trackers[i].updateCount[j] > 2) continue;
+
+                        Matrix4x4 aRot = trackers[i].singles[j].rot;
+                        Quaternion qRot = aRot.Rotation();
                         for (int k = 0; k < trackers[i].singles[j].altRots.Length; k++) {
-                            Matrix4x4 aRot;
-                            //if (k == -1) aRot = trackers[i].singles[j].rot;
-                            aRot = trackers[i].singles[j].altRots[k];
-                            Quaternion qRot = aRot.Rotation();
-                            bool reptd = false;
-                            for (int l = k - 1; l >= -1; l--) {
-                                Matrix4x4 aRot2;
-                                if (l == -1) aRot2 = trackers[i].singles[j].rot;
-                                else aRot2 = trackers[i].singles[j].altRots[l];
-                                Quaternion qRot2 = aRot2.Rotation();
-                                float dot = Quaternion.Dot(qRot, qRot2);
-                                //Console.WriteLine($"({k}, {l}): {dot}");
-                                if (dot > 0.99f) {
-                                    reptd = true;
-                                    break;
-                                }
-                            }
-                            trackers[i].singles[j].repeatedRots[k] = reptd;
+                            Matrix4x4 aRota = trackers[i].singles[j].altRots[k];
+                            Quaternion qRota = aRota.Rotation();
+                            float dot = Quaternion.Dot(qRot, qRota);
+                            trackers[i].singles[j].repeatedRots[k] = dot > 0.99f;
                         }
+
+                        //for (int k = 0; k < trackers[i].singles[j].altRots.Length; k++) {
+                        //    Matrix4x4 aRot;
+                        //    //if (k == -1) aRot = trackers[i].singles[j].rot;
+                        //    aRot = trackers[i].singles[j].altRots[k];
+                        //    Quaternion qRot = aRot.Rotation();
+                        //    bool reptd = false;
+                        //    for (int l = k - 1; l >= -1; l--) {
+                        //        Matrix4x4 aRot2;
+                        //        if (l == -1) aRot2 = trackers[i].singles[j].rot;
+                        //        else aRot2 = trackers[i].singles[j].altRots[l];
+                        //        Quaternion qRot2 = aRot2.Rotation();
+                        //        float dot = Quaternion.Dot(qRot, qRot2);
+                        //        //Console.WriteLine($"({k}, {l}): {dot}");
+                        //        if (dot > 0.99f) {
+                        //            reptd = true;
+                        //            break;
+                        //        }
+                        //    }
+                        //    trackers[i].singles[j].repeatedRots[k] = reptd;
+                        //}
                         //Console.WriteLine($"{trackers[i].singles[j].repeatedRots[0]}, {trackers[i].singles[j].repeatedRots[1]}, {trackers[i].singles[j].repeatedRots[2]}, {trackers[i].singles[j].repeatedRots[3]}");
                         //Console.WriteLine();
                     }
@@ -239,9 +249,9 @@ namespace TrackingSmoothing {
                 }
                 ghost++;
                 sw.Stop();
-                if (sw.ElapsedMilliseconds > 10) {
+                if (sw.Elapsed.TotalMilliseconds > 5) {
                     //Console.WriteLine($"Tracker ({trackerName}) took too long: {sw.ElapsedMilliseconds}ms / {calcCount} times");
-                    Program.infoBarWarning = $"{trackerName} {sw.ElapsedMilliseconds}ms {(warn ? "skip" : "")}";
+                    Program.infoBarWarning = $"{trackerName} {sw.Elapsed.TotalMilliseconds.ToString("0.00")}ms {(warn ? "skip" : "")}";
                 }
                 //bestCorner = new int[] { 3, 2, -1, -1 };
                 InitializeValues(cams, bestCorner, out trackersMat, out trackerRotationsMat, out trackerOffsetsMat, out trackerStraightness);
