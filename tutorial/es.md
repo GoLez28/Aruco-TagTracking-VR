@@ -7,7 +7,7 @@ debes instalar VMT https://github.com/gpsnmeajp/VirtualMotionTracker/releases/ta
 una vez instalado no se necesita hacer nada mas (eso creo).
 Despues, vas a tener que descargar mi programa https://github.com/GoLez28/TagTracking/releases/tag/v0.4, cuando lo abras por primera vez, se generara el archivo "arucoboard.png" al lado del .exe,  
 <img src="https://raw.githubusercontent.com/GoLez28/TagTracking/master/tutorial/arucoboard.png" width="200">   
-esto es lo que vas a tener que imprimir, pero solo lo que necesites, por ejemplo si vas a usar 4 para el pie derecho, 4 pal derecho y 6 para la cintura,  
+esto es lo que vas a tener que imprimir, pero solo lo que necesites, por ejemplo si vas a usar 4 para el pie derecho, 4 para el izquierdo y 6 para la cintura,  
 necesitaras 14 en total, lo demas va a ser innecesario.
 
 asegurate de que todos los tags sean del mismo tamaño, cuando ya los tengas impresos, midelos y coloca los milimetros del cuadrado negro en config.txt, trackerSize=x  
