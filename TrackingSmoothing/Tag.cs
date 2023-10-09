@@ -124,6 +124,8 @@ namespace TrackingSmoothing {
             public bool useCustomDistortion = false;
             public bool newData = false;
             public float brightness = 1f;
+            public int skipFrames = 0;
+            public int skipFrameCount = 0;
             public float[] customDist = new float[] {
                     1.075f, 1f, 1.075f,
                     1.025f, 0.975f, 1.025f,
@@ -328,7 +330,7 @@ namespace TrackingSmoothing {
             combinedTrackers = new();
             rawTrackers = new CombinedTracker[36];
             for (int j = 0; j < rawTrackers.Length; j++) {
-                rawTrackers[i] = new(j);
+                rawTrackers[j] = new(j);
             }
         }
         public static void SetFinalTrackers(float mult = 1f) {

@@ -222,7 +222,6 @@ namespace TrackingSmoothing {
                 hmdRot[2] = hmdRotEuler.Z;
 
                 float time = timer.ElapsedMilliseconds / 1000000f;
-                trackerDelay = 300f;
                 hmdList.Add(new Vector4(hmdPosV3.X, hmdPosV3.Y, hmdPosV3.Z, time));
                 while (hmdList.Count > 1 && hmdList[0].W < time - trackerDelay / 1000000f)
                     hmdList.RemoveAt(0);
@@ -434,27 +433,27 @@ namespace TrackingSmoothing {
                 offsetMat.M42 += 0.01f;
                 Console.WriteLine($"Increased Z offset {offsetMat.M42}");
             } else if (key == ConsoleKey.E) {
-                rotationY -= 0.01f;
+                rotationY -= 0.05f;
                 Console.WriteLine($"Decreased Yaw offset {rotationY}");
                 ApplyOffset();
             } else if (key == ConsoleKey.R) {
-                rotationY += 0.01f;
+                rotationY += 0.05f;
                 Console.WriteLine($"Increased Yaw offset {rotationY}");
                 ApplyOffset();
             } else if (key == ConsoleKey.D) {
-                rotationX -= 0.01f;
+                rotationX -= 0.05f;
                 Console.WriteLine($"Decreased xRot offset {rotationX}");
                 ApplyOffset();
             } else if (key == ConsoleKey.F) {
-                rotationX += 0.01f;
+                rotationX += 0.05f;
                 Console.WriteLine($"Increased xRot offset {rotationX}");
                 ApplyOffset();
             } else if (key == ConsoleKey.C) {
-                rotationZ -= 0.01f;
+                rotationZ -= 0.05f;
                 Console.WriteLine($"Decreased zRot offset {rotationZ}");
                 ApplyOffset();
             } else if (key == ConsoleKey.V) {
-                rotationZ += 0.01f;
+                rotationZ += 0.05f;
                 Console.WriteLine($"Increased zRot offset {rotationZ}");
                 ApplyOffset();
             } else if (key == ConsoleKey.D9) {
@@ -660,6 +659,8 @@ namespace TrackingSmoothing {
                             Tag.cameras[j].depthMult = float.Parse(split[1], any, invariantCulture);
                         } else if (split[0].Equals($"camera{j}Brightness")) {
                             Tag.cameras[j].brightness = float.Parse(split[1], any, invariantCulture);
+                        } else if (split[0].Equals($"camera{j}FrameSkip")) {
+                            Tag.cameras[j].skipFrames = int.Parse(split[1]);
                         }
                     }
                 }

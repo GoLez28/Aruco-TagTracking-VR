@@ -155,7 +155,14 @@ namespace TrackingSmoothing {
                     Console.WriteLine("Wait... this is illegal");
                 }
                 System.Diagnostics.Debug.WriteLine(c);
-                frame = capture[c].QueryFrame();
+                while (true) {
+                    frame = capture[c].QueryFrame();
+                    if (Tag.cameras[c].skipFrameCount >= Tag.cameras[c].skipFrames) {
+                        Tag.cameras[c].skipFrameCount = 0;
+                        break;
+                    }
+                    Tag.cameras[c].skipFrameCount++;
+                }
                 bool correctRes = Tag.cameras[c].rsHeight > 10 && Tag.cameras[c].rsWidth > 10;
                 if (correctRes) {
                     int newWidth = Tag.cameras[c].rsWidth;
