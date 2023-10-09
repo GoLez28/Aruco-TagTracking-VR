@@ -334,13 +334,11 @@ namespace TrackingSmoothing {
             offsetMat.M42 = offsetMat.M42 + roomOffset.Y;
             offsetMat.M43 = offsetMat.M43 + roomOffset.Z;
 
-            Quaternion q = Quaternion.CreateFromRotationMatrix(offsetMat);
-            var yaw = Math.Atan2(2.0 * (q.Y * q.Z + q.W * q.X), q.W * q.W - q.X * q.X - q.Y * q.Y + q.Z * q.Z);
-            var pitch = Math.Asin(-2.0 * (q.X * q.Z - q.W * q.Y));
-            var roll = Math.Atan2(2.0 * (q.X * q.Y + q.W * q.Z), q.W * q.W + q.X * q.X - q.Y * q.Y - q.Z * q.Z);
-            rotationZ = (float)yaw;
-            rotationX = (float)pitch;
-            rotationY = (float)roll;
+            Quaternion asdd = Quaternion.CreateFromRotationMatrix(offsetMat);
+            ToYawPitchRoll(asdd, out float newY, out float newX, out float newZ);
+            rotationY = newY;
+            rotationX = newX;
+            rotationZ = newZ;
             //Matrix4x4.Invert(diff, out offsetMat);
         }
 
@@ -562,6 +560,29 @@ namespace TrackingSmoothing {
             newMat.M42 = offsetMat.M42;
             newMat.M43 = offsetMat.M43;
             offsetMat = newMat;
+        }
+        static void ToYawPitchRoll(Quaternion quaternion, out float yaw, out float pitch, out float roll) {
+            // Convert the quaternion to Euler angles (yaw, pitch, roll)
+            float sqw = quaternion.W * quaternion.W;
+            float sqx = quaternion.X * quaternion.X;
+            float sqy = quaternion.Y * quaternion.Y;
+            float sqz = quaternion.Z * quaternion.Z;
+
+            // Yaw (heading) rotation
+            float t0 = 2.0f * (quaternion.W * quaternion.Z + quaternion.X * quaternion.Y);
+            float t1 = 1.0f - 2.0f * (sqy + sqz);
+            yaw = (float)Math.Atan2(t0, t1);
+
+            // Pitch (attitude) rotation
+            float t2 = 2.0f * (quaternion.W * quaternion.X - quaternion.Y * quaternion.Z);
+            t2 = t2 > 1.0f ? 1.0f : t2;
+            t2 = t2 < -1.0f ? -1.0f : t2;
+            pitch = (float)Math.Asin(t2);
+
+            // Roll (bank) rotation
+            float t3 = 2.0f * (quaternion.W * quaternion.Y + quaternion.Z * quaternion.X);
+            float t4 = 1.0f - 2.0f * (sqx + sqy);
+            roll = (float)Math.Atan2(t3, t4);
         }
 
         static void LoadOffsets() {

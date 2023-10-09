@@ -314,17 +314,18 @@ namespace TrackingSmoothing {
                     sumPosPresence += Utils.GetMap(trackerPresence[i], minPosPresence, maxPosPresence, 1f, 0f);
                 }
                 //SET WEIGHTED CENTER FROM TRACKERS
-                if (actualAvailableTrackers == 0) {
+                if (actualAvailableTrackers == 0 || sumPosPresence == 0) {
                     avgPosPresence = prevPos;
                 } else {
                     //avgPosPresence += prevPos * (1f / sumPosPresence);
                     for (int i = 0; i < estimatedPos0.Length; i++) {
                         float add = Utils.GetMap(trackerPresence[i], minPosPresence, maxPosPresence, 1f / sumPosPresence, 0f);
-                        avgPosPresence += poss[i] * add;
+                        if (!float.IsNaN(add))
+                            avgPosPresence += poss[i] * add;
                     }
                 }
                 //AVERAGE VALIDATED ROTATIONS
-                Quaternion prevRotPresence = new Quaternion(0, 0, 0, 0);
+                Quaternion prevRotPresence = Quaternion.Identity;
                 //if (trackerName.Equals("waist")) {
                 //    for (int i = 0; i < trackerPresence.Length; i++) {
                 //        Console.SetCursorPosition(0, i + 200);
