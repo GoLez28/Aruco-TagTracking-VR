@@ -433,27 +433,27 @@ namespace TrackingSmoothing {
                 offsetMat.M42 += 0.01f;
                 Console.WriteLine($"Increased Z offset {offsetMat.M42}");
             } else if (key == ConsoleKey.E) {
-                rotationY -= 0.05f;
+                rotationY -= 0.03f;
                 Console.WriteLine($"Decreased Yaw offset {rotationY}");
                 ApplyOffset();
             } else if (key == ConsoleKey.R) {
-                rotationY += 0.05f;
+                rotationY += 0.03f;
                 Console.WriteLine($"Increased Yaw offset {rotationY}");
                 ApplyOffset();
             } else if (key == ConsoleKey.D) {
-                rotationX -= 0.05f;
+                rotationX -= 0.03f;
                 Console.WriteLine($"Decreased xRot offset {rotationX}");
                 ApplyOffset();
             } else if (key == ConsoleKey.F) {
-                rotationX += 0.05f;
+                rotationX += 0.03f;
                 Console.WriteLine($"Increased xRot offset {rotationX}");
                 ApplyOffset();
             } else if (key == ConsoleKey.C) {
-                rotationZ -= 0.05f;
+                rotationZ -= 0.03f;
                 Console.WriteLine($"Decreased zRot offset {rotationZ}");
                 ApplyOffset();
             } else if (key == ConsoleKey.V) {
-                rotationZ += 0.05f;
+                rotationZ += 0.03f;
                 Console.WriteLine($"Increased zRot offset {rotationZ}");
                 ApplyOffset();
             } else if (key == ConsoleKey.D9) {
@@ -470,15 +470,15 @@ namespace TrackingSmoothing {
                     if (!oscClientDebug.isRunning) {
                         oscClientDebug.StartClient();
                     }
-                    //Process.Start(@"viewer\tagTrackingViewer.exe");
-                    //ProcessStartInfo processInfo = new ProcessStartInfo();
-                    //processInfo.FileName = @"viewer\tagTrackingViewer.exe";
-                    //processInfo.ErrorDialog = true;
-                    //processInfo.UseShellExecute = false;
-                    //processInfo.RedirectStandardOutput = true;
-                    //processInfo.RedirectStandardError = true;
-                    //processInfo.WorkingDirectory = Path.GetDirectoryName(@"viewer\tagTrackingViewer.exe");
-                    //Process.Start(processInfo);
+                    Process.Start(@"viewer\tagTrackingViewer.exe");
+                    ProcessStartInfo processInfo = new ProcessStartInfo();
+                    processInfo.FileName = @"viewer\tagTrackingViewer.exe";
+                    processInfo.ErrorDialog = true;
+                    processInfo.UseShellExecute = false;
+                    processInfo.RedirectStandardOutput = true;
+                    processInfo.RedirectStandardError = true;
+                    processInfo.WorkingDirectory = Path.GetDirectoryName(@"viewer\tagTrackingViewer.exe");
+                    Process.Start(processInfo);
                 } else {
                     if (oscClientDebug.isRunning) {
                         oscClientDebug.StopClient();
