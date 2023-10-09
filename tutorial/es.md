@@ -5,7 +5,7 @@ si vas a querer utilizar mi programa, vas a tener que descargar ese proyecto de 
 Empezando, debes instalar un driver para steamvr, que permitira que el tracker sea detectado por steamvr,  
 debes instalar VMT https://github.com/gpsnmeajp/VirtualMotionTracker/releases/tag/v0.15 , el instalador es bastante facil de usar,  
 una vez instalado no se necesita hacer nada mas (eso creo).
-Despues, vas a tener que descargar mi programa, cuando lo abras por primera vez, se generara el archivo "arucoboard.png" al lado del .exe,  
+Despues, vas a tener que descargar mi programa https://github.com/GoLez28/TagTracking/releases/tag/v0.4, cuando lo abras por primera vez, se generara el archivo "arucoboard.png" al lado del .exe,  
 <img src="https://raw.githubusercontent.com/GoLez28/TagTracking/master/tutorial/arucoboard.png" width="200">   
 esto es lo que vas a tener que imprimir, pero solo lo que necesites, por ejemplo si vas a usar 4 para el pie derecho, 4 pal derecho y 6 para la cintura,  
 necesitaras 14 en total, lo demas va a ser innecesario.
