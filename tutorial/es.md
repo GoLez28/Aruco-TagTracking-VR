@@ -58,7 +58,8 @@ la camara lo pones de manera que se vea la imagen completa, y vas moviendo la ca
 Una vez hecho eso en la carpeta de la app de calibracion, deberia haber un archivo llamado 'calib.yaml' en la carpeta 'config',  
 copias los valores del archivo 'config.yaml' a 'cameraParameters1.xml' que esta en la carpeta de la aplicacion que vamos a usar,  
 hay que copiar de camMat a cameraMatrix, y de distCoeffs a dist_coeffs, fijate que xml no usa comas si no que espacios,  
-(si la camara cambia en tema de resolucion, o otra cosa, se debe hacer la calibracion de nuevo)
+(si la camara cambia en tema de resolucion, o otra cosa, se debe hacer la calibracion de nuevo)  
+<img src="https://raw.githubusercontent.com/GoLez28/TagTracking/master/tutorial/calib vals.png" width="600">  
 
 ahora toca configurar las camaras, en config.txt tienes que asegurarte de que cameraXFile sea el nombre del xml de calibracion (un xml para cada camara), seguido de la resolucion y ID (Index),  
 lo mismo para todas las camaras que vas a usar definido por totalCameras (entre mas camaras, resolucion, fps, mas CPU va a usar),  
