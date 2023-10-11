@@ -325,7 +325,7 @@ namespace TrackingSmoothing {
                     }
                 }
                 //AVERAGE VALIDATED ROTATIONS
-                Quaternion prevRotPresence = Quaternion.Identity;
+                Quaternion prevRotPresence = new Quaternion(0, 0, 0, 0); //DONT CHANGE, LEAVE ALL AT ZERO
                 //if (trackerName.Equals("waist")) {
                 //    for (int i = 0; i < trackerPresence.Length; i++) {
                 //        Console.SetCursorPosition(0, i + 200);
