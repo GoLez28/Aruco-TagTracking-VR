@@ -32,6 +32,8 @@ namespace TrackingSmoothing {
             public float avgSmoothVal = 0.1f; //w 0.04
             public float avgSmoothRecoverVal = 0.95f;
             public float avgSmoothAlwaysVal = 0.08f;
+            public float maxSpikePosDist = 0.5f;
+            public float maxSpikeRotDiff = 0.9f;
             public float smoothedRot = 5;
             public float smoothedPos = 2;
             int ghost = 0; //cheap way to avoid all uppdateCount at 0 and crash

@@ -25,6 +25,8 @@ namespace TrackingSmoothing {
 
             public OneEuroFilter<Vector3> smoothedPos = new OneEuroFilter<Vector3>(2); //w 25
             public OneEuroFilter<Quaternion> smoothedRot = new OneEuroFilter<Quaternion>(5); //w 150
+            public List<Quaternion> rotList = new();
+            public List<Vector3> posList = new();
             public Vector3 alwaysSmoothed = new Vector3();
             public Vector3 smoothPrevPos = new Vector3();
             public Quaternion smoothPrevRot = new Quaternion();
@@ -32,6 +34,8 @@ namespace TrackingSmoothing {
             public float avgSmoothVal = 0.2f; //w 0.04
             public float avgSmoothRecoverVal = 0.9f;
             public float avgSmoothAlwaysVal = 0.08f;
+            public float maxSpikePosDist = 0.5f;
+            public float maxSpikeRotDiff = 0.9f;
 
             public FinalTracker(Vector3 pos, Quaternion rot, Quaternion prot, string name) {
                 this.pos = pos;
@@ -49,7 +53,53 @@ namespace TrackingSmoothing {
                 pfpos = fpos;
                 pfrot = frot;
 
-                //frot = Quaternion.Lerp(smoothPrevRot, frot, 0.5f);
+                //filter rotation spikes
+                rotList.Insert(0, rot);
+                if (rotList.Count > 10)
+                    rotList.RemoveAt(rotList.Count - 1);
+                List<Quaternion> r1List = new List<Quaternion>();
+                List<Quaternion> r2List = new List<Quaternion>();
+                Quaternion lastRot = rotList[0];
+                r1List.Add(lastRot);
+                bool switched = false;
+                for (int i = 1; i < rotList.Count; i++) {
+                    Quaternion curRot = rotList[i];
+                    float rotDiff = Quaternion.Dot(Quaternion.Inverse(lastRot) * curRot, Quaternion.Identity);
+                    if (rotDiff < 0.9f) {
+                        switched = !switched;
+                    }
+                    if (switched) r2List.Add(curRot);
+                    else r1List.Add(curRot);
+                    lastRot = curRot;
+                }
+                if (r1List.Count < r2List.Count && Program.preNoise != 0) {
+                    if (r2List.Count > 7) rot = r2List[0];
+                }
+
+                //filter position spikes
+                posList.Insert(0, pos);
+                if (posList.Count > 10)
+                    posList.RemoveAt(posList.Count - 1);
+                List<Vector3> p1List = new List<Vector3>();
+                List<Vector3> p2List = new List<Vector3>();
+                Vector3 lastPos = posList[0];
+                p1List.Add(lastPos);
+                switched = false;
+                for (int i = 1; i < posList.Count; i++) {
+                    Vector3 curPos = posList[i];
+                    float posDist = Utils.GetDistance(lastPos.X, lastPos.Y, lastPos.Z, curPos.X, curPos.Y, curPos.Z);
+                    if (posDist > 0.05f) {
+                        switched = !switched;
+                    }
+                    if (switched) p2List.Add(curPos);
+                    else p1List.Add(curPos);
+                    lastPos = curPos;
+                }
+                if (p1List.Count < p2List.Count && Program.preNoise != 0) {
+                    if (p2List.Count > 7) pos = p2List[0];
+                }
+
+                //one euro filtering
                 if (!float.IsNaN(rot.X)) {
                     if (float.IsNaN(smoothedRot.currValue.X))
                         smoothedRot = new OneEuroFilter<Quaternion>(smoothedRot.freq);
@@ -65,6 +115,7 @@ namespace TrackingSmoothing {
                 if (!float.IsNaN(pos.X))
                     fpos = smoothedPos.Filter(pos);
 
+                //make an average filtering
                 float distTh = avgSmoothDistTrigger; //0.0004f
                 float smoothiness = avgSmoothVal;
                 alwaysSmoothed += (fpos - alwaysSmoothed) * avgSmoothAlwaysVal;
@@ -76,10 +127,6 @@ namespace TrackingSmoothing {
 
                 float smoothinessRot = smoothiness + (1 - smoothiness) / 2; //to be less smoothed
                 smoothinessRot = smoothinessRot * 0.8f + smoothiness * 0.2f;
-                //smoothPrevRot.X += (frot.X - smoothPrevRot.X) * smoothinessRot;
-                //smoothPrevRot.Y += (frot.Y - smoothPrevRot.Y) * smoothinessRot;
-                //smoothPrevRot.Z += (frot.Z - smoothPrevRot.Z) * smoothinessRot;
-                //smoothPrevRot.W += (frot.W - smoothPrevRot.W) * smoothinessRot;
                 smoothPrevRot = Quaternion.Lerp(smoothPrevRot, frot, smoothinessRot);
                 smoothPrevRot = Quaternion.Normalize(smoothPrevRot);
                 frot = smoothPrevRot;
@@ -291,6 +338,8 @@ namespace TrackingSmoothing {
                             else if (split2[0].Equals("avgSmoothVal")) currentTracker.avgSmoothVal = val;
                             else if (split2[0].Equals("avgSmoothRecoverVal")) currentTracker.avgSmoothRecoverVal = val;
                             else if (split2[0].Equals("avgSmoothAlwaysVal")) currentTracker.avgSmoothAlwaysVal = val;
+                            else if (split2[0].Equals("maxSpikePosDist")) currentTracker.maxSpikePosDist = val;
+                            else if (split2[0].Equals("maxSpikeRotDiff")) currentTracker.maxSpikeRotDiff = val;
                             else if (split2[0].Equals("rotationComparison")) currentTracker.rotationComparison = val;
                             else if (split2[0].Equals("straightTrackerWeight")) currentTracker.straightTrackerWeight = val;
                             else if (split2[0].Equals("filterSmoothRot")) currentTracker.smoothedRot = val;
@@ -347,6 +396,8 @@ namespace TrackingSmoothing {
             finals[id].avgSmoothDistTrigger = trackers[id].avgSmoothDistTrigger * mult;
             finals[id].smoothedRot.UpdateParams(trackers[id].smoothedRot * mult);
             finals[id].smoothedPos.UpdateParams(trackers[id].smoothedPos * mult);
+            finals[id].maxSpikePosDist = trackers[id].maxSpikePosDist;
+            finals[id].maxSpikeRotDiff = trackers[id].maxSpikeRotDiff;
         }
         public static List<RecieveTag> tagsList = new List<RecieveTag>();
         public static void RecieveTrackerAsync(int index, int camera, Matrix4x4 rot, Vector3 pos, int altRot) {
