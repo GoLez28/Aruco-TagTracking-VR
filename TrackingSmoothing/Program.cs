@@ -168,7 +168,7 @@ namespace TrackingSmoothing {
                     if (adjustOffset) {
                         var controller = app.OVRSystem.GetTrackedDeviceIndexForControllerRole(Valve.VR.ETrackedControllerRole.RightHand);
                         Valve.VR.VRControllerState_t state = new();
-                        bool lol = app.OVRSystem.GetControllerState(controller, ref state, (uint)System.Runtime.InteropServices.Marshal.SizeOf(state));
+                        bool lol = app.OVRSystem.GetControllerState(controller, ref state, (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(Valve.VR.VRControllerState_t)));
                         bool moveTrigger = state.rAxis2.x > 0.5f;
                         bool rotateTrigger = state.rAxis1.x > 0.5f;
 
@@ -181,6 +181,9 @@ namespace TrackingSmoothing {
                                 Console.ResetColor();
                             }
                         }
+                        //getting controller state stopped working long ago
+                        bool isGripPressed = (state.ulButtonPressed & (1ul << (int)Valve.VR.EVRButtonId.k_EButton_Grip)) != 0;
+                        bool isTriggerPressed = (state.ulButtonPressed & (1ul << (int)Valve.VR.EVRButtonId.k_EButton_SteamVR_Trigger)) != 0;
                         if (isMoveKeyPressed) moveTrigger = true;
                         if (isRotateKeyPressed) rotateTrigger = true;
 
@@ -230,9 +233,25 @@ namespace TrackingSmoothing {
                 Tag.GetTrackers();
                 Tag.SendTrackers();
                 if (debugSendTrackerOSC) {
+                    //lefthand
+                    var mlh = devPos[1].mDeviceToAbsoluteTracking;
+                    Matrix4x4 hmdRotMatLH = new Matrix4x4(mlh.m0, mlh.m4, mlh.m8, 0, mlh.m1, mlh.m5, mlh.m9, 0, mlh.m2, mlh.m6, mlh.m10, 0, mlh.m3, mlh.m7, mlh.m11, 1);
+                    Vector3 hmdPosV3LH = hmdRotMatLH.Translation;
+                    oscClientDebug.Send("/debug/final/position", 8,
+                                       hmdPosV3LH.X, hmdPosV3LH.Y, -hmdPosV3LH.Z, //1f, 1.7f, 1f
+                                       0, 0, 0, 1);
+                    //righthand
+                    var mrh = devPos[2].mDeviceToAbsoluteTracking;
+                    Matrix4x4 hmdRotMatRH = new Matrix4x4(mrh.m0, mrh.m4, mrh.m8, 0, mrh.m1, mrh.m5, mrh.m9, 0, mrh.m2, mrh.m6, mrh.m10, 0, mrh.m3, mrh.m7, mrh.m11, 1);
+                    Vector3 hmdPosV3RH = hmdRotMatRH.Translation;
+                    oscClientDebug.Send("/debug/final/position", 7,
+                                       hmdPosV3RH.X, hmdPosV3RH.Y, -hmdPosV3RH.Z, //1f, 1.7f, 1f
+                                       0, 0, 0, 1);
+
                     oscClientDebug.Send("/debug/final/position", 10,
                                        hmdPosV3.X, hmdPosV3.Y, -hmdPosV3.Z, //1f, 1.7f, 1f
                                        0, 0, 0, 1);
+
                     Matrix4x4 mat = hmdRotMat;
                     mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), mat);
                     //mat.M42 = hmdRotMat.M42;
