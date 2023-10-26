@@ -286,6 +286,7 @@ namespace TrackingSmoothing {
 
                 }
                 for (int i = 0; i < poss.Length; i++) {
+                    if (updateCount[i] > 3) continue;
                     Aruco.DrawAxis(Matrix4x4.CreateTranslation(poss[i]), 0.1f);
                 }
 
@@ -313,7 +314,9 @@ namespace TrackingSmoothing {
                     maxPosPresence++;
                 float sumPosPresence = 0;
                 for (int i = 0; i < estimatedPos0.Length; i++) {
-                    sumPosPresence += Utils.GetMap(trackerPresence[i], minPosPresence, maxPosPresence, 1f, 0f);
+                    float m = trackerStraightness[i] > 0.25f ? (Utils.GetMap(trackerStraightness[i], 0.25f, 0.5f, 1f, 0f)) : 1f;
+                    m = (float)Math.Pow(m, 2);
+                    sumPosPresence += Utils.GetMap(trackerPresence[i], minPosPresence, maxPosPresence, 1f, 0f) * m;
                 }
                 //SET WEIGHTED CENTER FROM TRACKERS
                 if (actualAvailableTrackers == 0 || sumPosPresence == 0) {
@@ -321,7 +324,9 @@ namespace TrackingSmoothing {
                 } else {
                     //avgPosPresence += prevPos * (1f / sumPosPresence);
                     for (int i = 0; i < estimatedPos0.Length; i++) {
-                        float add = Utils.GetMap(trackerPresence[i], minPosPresence, maxPosPresence, 1f / sumPosPresence, 0f);
+                        float m = trackerStraightness[i] > 0.25f ? (Utils.GetMap(trackerStraightness[i], 0.25f, 0.5f, 1f, 0f)) : 1f;
+                        m = (float)Math.Pow(m, 2);
+                        float add = Utils.GetMap(trackerPresence[i], minPosPresence, maxPosPresence, 1f / sumPosPresence, 0f) * m;
                         if (!float.IsNaN(add))
                             avgPosPresence += poss[i] * add;
                     }
@@ -596,14 +601,13 @@ namespace TrackingSmoothing {
                         estimatedPos[i] = newMat.Translation;
                         estimatedRot[i] = newMat.Rotation();
                         if (final) {
-                            trackerPresence[i] -= 1 - (1 - (trackerStraightness[i] + straightTrackerWeight)) * 2;
+                            trackerPresence[i] -= straightTrackerWeight;
 
                             int camera = i % cameras.Length;
                             float min = Utils.GetMap(cameras[camera].quality, 1f, 2f, 50f, 0f);
                             min = (float)Math.Max(min, 0);
                             if (trackerPresence[i] < min)
                                 trackerPresence[i] = min;
-                            trackerPresence[i] = min;
                         }
                     }
                 }
@@ -656,10 +660,9 @@ namespace TrackingSmoothing {
                             estimatedRot[i] = availableAvgRot * prevMat[i].Rotation();
                         }
                         if (final) {
-                            trackerPresence[i] += 1 + (1 - (trackerStraightness[i] + straightTrackerWeight)) * 2;
+                            trackerPresence[i] += straightTrackerWeight * 2;
                             if (trackerPresence[i] > 100)
                                 trackerPresence[i] = 100;
-                            trackerPresence[i] = 100;
                         }
                     }
                 }

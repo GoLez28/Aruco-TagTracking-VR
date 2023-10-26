@@ -16,6 +16,11 @@ namespace TrackingSmoothing {
                 Math.Pow(y1 - y2, 2) +
                 Math.Pow(z1 - z2, 2));
         }
+        public static float GetRotationDifference(Quaternion q1, Quaternion q2) {
+            Quaternion d = q1 * Quaternion.Inverse(q2);
+            float ad = Math.Abs(d.X) + Math.Abs(d.Y) + Math.Abs(d.Z);
+            return ad;
+        }
         static public float GetMap(float value, float start1, float stop1, float start2, float stop2) {
             //From Processing
             float outgoing = start2 + (stop2 - start2) * ((value - start1) / (stop1 - start1));

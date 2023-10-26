@@ -165,6 +165,7 @@ namespace TrackingSmoothing {
 
                 //CHECK FOR ROTATION STARIGHTNESS
                 //i dont remember what is this for lol
+
                 //Quaternion q = Quaternion.CreateFromRotationMatrix(singles[camera].rot);
                 //Matrix4x4 mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0, 0, -0.1f)), Matrix4x4.CreateTranslation(pos));
                 //float depth = singles[camera].pos.Z;
@@ -173,8 +174,29 @@ namespace TrackingSmoothing {
                 //d -= depth / cameras[camera].quality / 4f;
                 //float r1 = mat.Translation.Z - pos.Z + 0.1f;
                 //float r2 = Utils.GetMap(r1, 0.2f, 0, 0.2f, d);
-                ////trackerStraightness[camera] = r2;
-                trackerStraightness[camera] = 0;
+                //trackerStraightness[camera] = r2;
+
+                //other plans for this
+
+                //Console.WriteLine(pos);
+                //Vector3 posInv = pos;
+                //posInv *= -1;
+                //posInv.Y *= -1;
+                //var lookatHor = Matrix4x4.CreateLookAt(posInv, new Vector3(), new Vector3(0, -1, 0));
+                //lookatHor.M43 = 0;
+                //lookatHor.M42 = 0;
+                //lookatHor.M41 = 0;
+                Matrix4x4 lookatMat = Matrix4x4.Multiply(rot, Matrix4x4.CreateTranslation(pos));
+                Matrix4x4 moveMat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0, 0, pos.Z)), lookatMat);
+                float d = Utils.GetDistance(moveMat.M41, moveMat.M42, moveMat.M43, 0, 0, 0) / pos.Z;
+                d = (float)Math.Pow(d*0.5f, 2);
+                trackerStraightness[camera] = d;
+                if (index == 0) {
+                    //Console.WriteLine(d);
+                    //Aruco.DrawAxis(moveMat, camera);
+                }
+
+                //trackerStraightness[camera] = 0;
 
                 //if (Program.preNoise && false) {
                 //    Matrix4x4 matp = Matrix4x4.Multiply(rot, Matrix4x4.CreateTranslation(pos));
