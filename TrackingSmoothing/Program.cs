@@ -49,6 +49,9 @@ namespace TrackingSmoothing {
         public static bool isRotateKeyPressed = false;
         public static bool wantToCloseWindows = false;
         public static int updateFPS = 80;
+        public static int interpolationTPS = 80;
+        public static bool useInterpolation = true;
+        public static System.Threading.Thread interpolationThread;
 
         public static bool ovrNotFound = false;
 
@@ -121,179 +124,185 @@ namespace TrackingSmoothing {
                 //Console.WriteLine($"start {i}");
                 videoCapture[i].Start();
             }
-            while (true) {
-                double delta = timer.Elapsed.TotalMilliseconds - previousTime;
-                previousTime = timer.Elapsed.TotalMilliseconds;
-                if (frameCount % 10 == 0) {
-                    Console.ForegroundColor = ConsoleColor.Black;
-                    Console.BackgroundColor = ConsoleColor.Gray;
-                    (int x, int y) = Console.GetCursorPosition();
-                    int ch = Console.WindowHeight;
-                    int ypos = (y + 1) - ch;
-                    if (ypos < 0) ypos = 0;
-                    Console.SetCursorPosition(0, ypos);
-                    for (int i = 0; i < Tag.cameraTPS.Length; i++) {
-                        if (i != 0) Console.Write(" / ");
-                        Console.Write($"Cam {i} TPS: {Tag.cameraTPS[i]:0.00}");
-                    }
-                    int initX = Console.CursorLeft;
-                    int endX = (initX / 8 + 1) * 8;
-                    for (int i = initX; i < endX; i++) {
-                        Console.Write(" ");
-                    }
-                    Console.Write($"App TPS: {(1000.0 / delta):0.00}");
-                    initX = Console.CursorLeft;
-                    endX = (initX / 8 + 2) * 8;
-                    for (int i = initX; i < endX; i++) {
-                        Console.Write(" ");
-                    }
-                    Console.Write(infoBarWarning);
-                    infoBarWarning = "";
-                    for (int i = Console.CursorLeft; i < Console.WindowWidth; i++) {
-                        Console.Write(" ");
-                    }
-                    Console.SetCursorPosition(x, y);
-                    Console.ResetColor();
+            interpolationThread = new System.Threading.Thread(() => Extrapolate.UpdateLoop());
+            interpolationThread.Start();
+            while (true) previousTime = UpdateLoop(app, previousTime);
+        }
+
+        private static double UpdateLoop(Application app, double previousTime) {
+            double delta = timer.Elapsed.TotalMilliseconds - previousTime;
+            previousTime = timer.Elapsed.TotalMilliseconds;
+            if (frameCount % 10 == 0) {
+                Console.ForegroundColor = ConsoleColor.Black;
+                Console.BackgroundColor = ConsoleColor.Gray;
+                (int x, int y) = Console.GetCursorPosition();
+                int ch = Console.WindowHeight;
+                int ypos = (y + 1) - ch;
+                if (ypos < 0) ypos = 0;
+                Console.SetCursorPosition(0, ypos);
+                for (int i = 0; i < Tag.cameraTPS.Length; i++) {
+                    if (i != 0) Console.Write(" / ");
+                    Console.Write($"Cam {i} TPS: {Tag.cameraTPS[i]:0.00}");
                 }
-                //Check for keys
-                if (Console.KeyAvailable) {
-                    ConsoleKey key = Console.ReadKey(true).Key;
-                    KeyPressed(key);
+                int initX = Console.CursorLeft;
+                int endX = (initX / 8 + 1) * 8;
+                for (int i = initX; i < endX; i++) {
+                    Console.Write(" ");
                 }
-                //Update OSC recieved messages
-                //Get OVR Device Positions
-                if (!ovrNotFound) {
-                    app.OVRSystem.GetDeviceToAbsoluteTrackingPose(Valve.VR.ETrackingUniverseOrigin.TrackingUniverseRawAndUncalibrated, 0, devPos);
-
-                    if (adjustOffset) {
-                        var controller = app.OVRSystem.GetTrackedDeviceIndexForControllerRole(Valve.VR.ETrackedControllerRole.RightHand);
-                        Valve.VR.VRControllerState_t state = new();
-                        bool lol = app.OVRSystem.GetControllerState(controller, ref state, (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(Valve.VR.VRControllerState_t)));
-                        bool moveTrigger = state.rAxis2.x > 0.5f;
-                        bool rotateTrigger = state.rAxis1.x > 0.5f;
-
-                        //lazy fix
-                        if (!lol) {
-                            if (!cannotGetControllers) {
-                                cannotGetControllers = true;
-                                Console.ForegroundColor = ConsoleColor.Red;
-                                Console.WriteLine("Cannot get controller input, use [P] to move and [O] to rotate instead");
-                                Console.ResetColor();
-                            }
-                        }
-                        //getting controller state stopped working long ago
-                        bool isGripPressed = (state.ulButtonPressed & (1ul << (int)Valve.VR.EVRButtonId.k_EButton_Grip)) != 0;
-                        bool isTriggerPressed = (state.ulButtonPressed & (1ul << (int)Valve.VR.EVRButtonId.k_EButton_SteamVR_Trigger)) != 0;
-                        if (isMoveKeyPressed) moveTrigger = true;
-                        if (isRotateKeyPressed) rotateTrigger = true;
-
-                        //i separate translate offset and rotate offset bc my brain just thinking about matrices
-                        var m2 = devPos[2].mDeviceToAbsoluteTracking;
-                        //Console.WriteLine($"{m2.m0:0.00},{m2.m1:0.00},{m2.m2:0.00},{m2.m3:0.00},{m2.m4:0.00},{m2.m5:0.00},{m2.m6:0.00},{m2.m7:0.00},{m2.m8:0.00},{m2.m9:0.00},{m2.m10:0.00},{m2.m11:0.00},");
-                        Matrix4x4 d = new();
-                        d.M41 = prevCont.m3 - m2.m3;
-                        d.M42 = prevCont.m7 - m2.m7;
-                        d.M43 = prevCont.m11 - m2.m11;
-                        d = Matrix4x4.Multiply(Matrix4x4.CreateFromYawPitchRoll(rotationZ, rotationX, rotationY), d);
-                        if (moveTrigger) {
-                            offsetMat.M41 += -d.M41;
-                            offsetMat.M43 += -d.M42;
-                            offsetMat.M42 += d.M43;
-                        } else if (rotateTrigger) {
-                            rotationY += d.M41;
-                            ApplyOffset();
-                        }
-                        prevCont = m2;
-                    }
+                Console.Write($"App TPS: {(1000.0 / delta):0.00}");
+                initX = Console.CursorLeft;
+                endX = (initX / 8 + 2) * 8;
+                for (int i = initX; i < endX; i++) {
+                    Console.Write(" ");
                 }
-                var m = devPos[0].mDeviceToAbsoluteTracking;
-                //Save only the HMD
-                Matrix4x4 hmdRotMat = new Matrix4x4(m.m0, m.m4, m.m8, 0, m.m1, m.m5, m.m9, 0, m.m2, m.m6, m.m10, 0, m.m3, m.m7, m.m11, 1);
-                if (useVRChatOSCTrackers || true) {
-                    Vector3 headInOffset = new Vector3(0, 0, 0.1f);
-                    hmdRotMat = Matrix4x4.Multiply(hmdRotMat, Matrix4x4.CreateTranslation(headInOffset));
+                Console.Write(infoBarWarning);
+                infoBarWarning = "";
+                for (int i = Console.CursorLeft; i < Console.WindowWidth; i++) {
+                    Console.Write(" ");
                 }
-                Matrix4x4 hmdCentered = hmdRotMat;
-                hmdCentered = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), hmdCentered);
-                Vector3 hmdPosV3 = hmdCentered.Translation;
-                hmdPos[0] = hmdPosV3.X;
-                hmdPos[1] = hmdPosV3.Y;
-                hmdPos[2] = hmdPosV3.Z;
-                Vector3 hmdRotEuler = Tag.ToEulerAngles(Quaternion.CreateFromRotationMatrix(hmdCentered));
-                hmdRot[0] = hmdRotEuler.X;
-                hmdRot[1] = hmdRotEuler.Y;
-                hmdRot[2] = hmdRotEuler.Z;
-
-                float time = timer.ElapsedMilliseconds / 1000000f;
-                hmdList.Add(new Vector4(hmdPosV3.X, hmdPosV3.Y, hmdPosV3.Z, time));
-                while (hmdList.Count > 1 && hmdList[0].W < time - trackerDelay / 1000000f)
-                    hmdList.RemoveAt(0);
-
-                Tag.Update();
-                Tag.GetTrackers();
-                Tag.SendTrackers();
-                if (debugSendTrackerOSC) {
-                    //lefthand
-                    var mlh = devPos[1].mDeviceToAbsoluteTracking;
-                    Matrix4x4 hmdRotMatLH = new Matrix4x4(mlh.m0, mlh.m4, mlh.m8, 0, mlh.m1, mlh.m5, mlh.m9, 0, mlh.m2, mlh.m6, mlh.m10, 0, mlh.m3, mlh.m7, mlh.m11, 1);
-                    Vector3 hmdPosV3LH = hmdRotMatLH.Translation;
-                    oscClientDebug.Send("/debug/final/position", 8,
-                                       hmdPosV3LH.X, hmdPosV3LH.Y, -hmdPosV3LH.Z, //1f, 1.7f, 1f
-                                       0, 0, 0, 1);
-                    //righthand
-                    var mrh = devPos[2].mDeviceToAbsoluteTracking;
-                    Matrix4x4 hmdRotMatRH = new Matrix4x4(mrh.m0, mrh.m4, mrh.m8, 0, mrh.m1, mrh.m5, mrh.m9, 0, mrh.m2, mrh.m6, mrh.m10, 0, mrh.m3, mrh.m7, mrh.m11, 1);
-                    Vector3 hmdPosV3RH = hmdRotMatRH.Translation;
-                    oscClientDebug.Send("/debug/final/position", 7,
-                                       hmdPosV3RH.X, hmdPosV3RH.Y, -hmdPosV3RH.Z, //1f, 1.7f, 1f
-                                       0, 0, 0, 1);
-
-                    oscClientDebug.Send("/debug/final/position", 10,
-                                       hmdPosV3.X, hmdPosV3.Y, -hmdPosV3.Z, //1f, 1.7f, 1f
-                                       0, 0, 0, 1);
-
-                    Matrix4x4 mat = hmdRotMat;
-                    mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), mat);
-                    //mat.M42 = hmdRotMat.M42;
-                    Vector3 matT = mat.Translation;
-                    oscClientDebug.Send("/debug/final/position", 9,
-                                               matT.X, matT.Y, -matT.Z, //1f, 1.7f, 1f
-                                               0, 0, 0, 1);
-
-                    int waist = -1;
-                    int leftfoot = -1;
-                    int rightfoot = -1;
-                    for (int i = 0; i < Tag.finals.Length; i++) {
-                        if (Tag.finals[i].name.Equals("leftfoot"))
-                            leftfoot = i;
-                        if (Tag.finals[i].name.Equals("rightfoot"))
-                            rightfoot = i;
-                        if (Tag.finals[i].name.Equals(poseAdjustWaist))
-                            waist = i;
-                    }
-                    Vector3 pos = Tag.finals[waist].fpos;
-                    Quaternion q = Tag.finals[waist].frot;
-                    Matrix4x4 matw = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(q), Matrix4x4.CreateTranslation(pos));
-                    matw = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-0.15f, 0f, 0f)), matw);
-                    //matw = Matrix4x4.Multiply(mat, Program.offsetMat);
-                    //matw.M41 -= (Program.hmdList[0].X - Program.hmdPos[0]) * Tag.trackers[waist].trackerFollowWeight;
-                    //matw.M43 -= (Program.hmdList[0].Y - Program.hmdPos[1]) * Tag.trackers[waist].trackerFollowWeight;
-                    //matw.M42 += (Program.hmdList[0].Z - Program.hmdPos[2]) * Tag.trackers[waist].trackerFollowWeight;
-                    oscClientDebug.Send("/debug/final/position", 6,
-                                               matw.Translation.X, matw.Translation.Z, matw.Translation.Y, //1f, 1.7f, 1f
-                                               -q.X, -q.Z, -q.Y, q.W);
-                }
-                if (autoOffset) {
-                    AdjustOffset(hmdRotMat);
-                    autoOffset = false;
-                    Console.WriteLine("Adjusted offsets");
-                }
-                //A mimir, wait for next frame (80fps)
-                System.Threading.Thread.Sleep(1000 / updateFPS);
-
-                var mm = devPos[3].mDeviceToAbsoluteTracking;
-                frameCount++;
+                Console.SetCursorPosition(x, y);
+                Console.ResetColor();
             }
+            //Check for keys
+            if (Console.KeyAvailable) {
+                ConsoleKey key = Console.ReadKey(true).Key;
+                KeyPressed(key);
+            }
+            //Update OSC recieved messages
+            //Get OVR Device Positions
+            if (!ovrNotFound) {
+                app.OVRSystem.GetDeviceToAbsoluteTrackingPose(Valve.VR.ETrackingUniverseOrigin.TrackingUniverseRawAndUncalibrated, 0, devPos);
+
+                if (adjustOffset) {
+                    var controller = app.OVRSystem.GetTrackedDeviceIndexForControllerRole(Valve.VR.ETrackedControllerRole.RightHand);
+                    Valve.VR.VRControllerState_t state = new();
+                    bool lol = app.OVRSystem.GetControllerState(controller, ref state, (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(Valve.VR.VRControllerState_t)));
+                    bool moveTrigger = state.rAxis2.x > 0.5f;
+                    bool rotateTrigger = state.rAxis1.x > 0.5f;
+
+                    //lazy fix
+                    if (!lol) {
+                        if (!cannotGetControllers) {
+                            cannotGetControllers = true;
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine("Cannot get controller input, use [P] to move and [O] to rotate instead");
+                            Console.ResetColor();
+                        }
+                    }
+                    //getting controller state stopped working long ago
+                    bool isGripPressed = (state.ulButtonPressed & (1ul << (int)Valve.VR.EVRButtonId.k_EButton_Grip)) != 0;
+                    bool isTriggerPressed = (state.ulButtonPressed & (1ul << (int)Valve.VR.EVRButtonId.k_EButton_SteamVR_Trigger)) != 0;
+                    if (isMoveKeyPressed) moveTrigger = true;
+                    if (isRotateKeyPressed) rotateTrigger = true;
+
+                    //i separate translate offset and rotate offset bc my brain just thinking about matrices
+                    var m2 = devPos[2].mDeviceToAbsoluteTracking;
+                    //Console.WriteLine($"{m2.m0:0.00},{m2.m1:0.00},{m2.m2:0.00},{m2.m3:0.00},{m2.m4:0.00},{m2.m5:0.00},{m2.m6:0.00},{m2.m7:0.00},{m2.m8:0.00},{m2.m9:0.00},{m2.m10:0.00},{m2.m11:0.00},");
+                    Matrix4x4 d = new();
+                    d.M41 = prevCont.m3 - m2.m3;
+                    d.M42 = prevCont.m7 - m2.m7;
+                    d.M43 = prevCont.m11 - m2.m11;
+                    d = Matrix4x4.Multiply(Matrix4x4.CreateFromYawPitchRoll(rotationZ, rotationX, rotationY), d);
+                    if (moveTrigger) {
+                        offsetMat.M41 += -d.M41;
+                        offsetMat.M43 += -d.M42;
+                        offsetMat.M42 += d.M43;
+                    } else if (rotateTrigger) {
+                        rotationY += d.M41;
+                        ApplyOffset();
+                    }
+                    prevCont = m2;
+                }
+            }
+            var m = devPos[0].mDeviceToAbsoluteTracking;
+            //Save only the HMD
+            Matrix4x4 hmdRotMat = new Matrix4x4(m.m0, m.m4, m.m8, 0, m.m1, m.m5, m.m9, 0, m.m2, m.m6, m.m10, 0, m.m3, m.m7, m.m11, 1);
+            if (useVRChatOSCTrackers || true) {
+                Vector3 headInOffset = new Vector3(0, 0, 0.1f);
+                hmdRotMat = Matrix4x4.Multiply(hmdRotMat, Matrix4x4.CreateTranslation(headInOffset));
+            }
+            Matrix4x4 hmdCentered = hmdRotMat;
+            hmdCentered = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), hmdCentered);
+            Vector3 hmdPosV3 = hmdCentered.Translation;
+            hmdPos[0] = hmdPosV3.X;
+            hmdPos[1] = hmdPosV3.Y;
+            hmdPos[2] = hmdPosV3.Z;
+            Vector3 hmdRotEuler = Tag.ToEulerAngles(Quaternion.CreateFromRotationMatrix(hmdCentered));
+            hmdRot[0] = hmdRotEuler.X;
+            hmdRot[1] = hmdRotEuler.Y;
+            hmdRot[2] = hmdRotEuler.Z;
+
+            float time = timer.ElapsedMilliseconds / 1000000f;
+            hmdList.Add(new Vector4(hmdPosV3.X, hmdPosV3.Y, hmdPosV3.Z, time));
+            while (hmdList.Count > 1 && hmdList[0].W < time - trackerDelay / 1000000f)
+                hmdList.RemoveAt(0);
+
+            Tag.Update();
+            Tag.GetTrackers();
+            Tag.SendTrackers();
+            if (debugSendTrackerOSC) {
+                //lefthand
+                var mlh = devPos[1].mDeviceToAbsoluteTracking;
+                Matrix4x4 hmdRotMatLH = new Matrix4x4(mlh.m0, mlh.m4, mlh.m8, 0, mlh.m1, mlh.m5, mlh.m9, 0, mlh.m2, mlh.m6, mlh.m10, 0, mlh.m3, mlh.m7, mlh.m11, 1);
+                Vector3 hmdPosV3LH = hmdRotMatLH.Translation;
+                oscClientDebug.Send("/debug/final/position", 8,
+                                   hmdPosV3LH.X, hmdPosV3LH.Y, -hmdPosV3LH.Z, //1f, 1.7f, 1f
+                                   0, 0, 0, 1);
+                //righthand
+                var mrh = devPos[2].mDeviceToAbsoluteTracking;
+                Matrix4x4 hmdRotMatRH = new Matrix4x4(mrh.m0, mrh.m4, mrh.m8, 0, mrh.m1, mrh.m5, mrh.m9, 0, mrh.m2, mrh.m6, mrh.m10, 0, mrh.m3, mrh.m7, mrh.m11, 1);
+                Vector3 hmdPosV3RH = hmdRotMatRH.Translation;
+                oscClientDebug.Send("/debug/final/position", 7,
+                                   hmdPosV3RH.X, hmdPosV3RH.Y, -hmdPosV3RH.Z, //1f, 1.7f, 1f
+                                   0, 0, 0, 1);
+
+                oscClientDebug.Send("/debug/final/position", 10,
+                                   hmdPosV3.X, hmdPosV3.Y, -hmdPosV3.Z, //1f, 1.7f, 1f
+                                   0, 0, 0, 1);
+
+                Matrix4x4 mat = hmdRotMat;
+                mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), mat);
+                //mat.M42 = hmdRotMat.M42;
+                Vector3 matT = mat.Translation;
+                oscClientDebug.Send("/debug/final/position", 9,
+                                           matT.X, matT.Y, -matT.Z, //1f, 1.7f, 1f
+                                           0, 0, 0, 1);
+
+                int waist = -1;
+                int leftfoot = -1;
+                int rightfoot = -1;
+                for (int i = 0; i < Tag.finals.Length; i++) {
+                    if (Tag.finals[i].name.Equals("leftfoot"))
+                        leftfoot = i;
+                    if (Tag.finals[i].name.Equals("rightfoot"))
+                        rightfoot = i;
+                    if (Tag.finals[i].name.Equals(poseAdjustWaist))
+                        waist = i;
+                }
+                Vector3 pos = Tag.finals[waist].fpos;
+                Quaternion q = Tag.finals[waist].frot;
+                Matrix4x4 matw = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(q), Matrix4x4.CreateTranslation(pos));
+                matw = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-0.15f, 0f, 0f)), matw);
+                //matw = Matrix4x4.Multiply(mat, Program.offsetMat);
+                //matw.M41 -= (Program.hmdList[0].X - Program.hmdPos[0]) * Tag.trackers[waist].trackerFollowWeight;
+                //matw.M43 -= (Program.hmdList[0].Y - Program.hmdPos[1]) * Tag.trackers[waist].trackerFollowWeight;
+                //matw.M42 += (Program.hmdList[0].Z - Program.hmdPos[2]) * Tag.trackers[waist].trackerFollowWeight;
+                oscClientDebug.Send("/debug/final/position", 6,
+                                           matw.Translation.X, matw.Translation.Z, matw.Translation.Y, //1f, 1.7f, 1f
+                                           -q.X, -q.Z, -q.Y, q.W);
+            }
+            if (autoOffset) {
+                AdjustOffset(hmdRotMat);
+                autoOffset = false;
+                Console.WriteLine("Adjusted offsets");
+            }
+            //A mimir, wait for next frame (80fps)
+            System.Threading.Thread.Sleep(1000 / updateFPS);
+
+            var mm = devPos[3].mDeviceToAbsoluteTracking;
+            frameCount++;
+
+            return previousTime;
         }
 
         private static void AdjustOffset(Matrix4x4 hmdRotMat) {
@@ -646,6 +655,9 @@ namespace TrackingSmoothing {
                 else if (split[0].Equals("roomOffsetZ")) roomOffset.Z = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("trackerSize")) Aruco.markersLength = int.Parse(split[1]);
                 else if (split[0].Equals("updatesPerSecond")) updateFPS = int.Parse(split[1]);
+                else if (split[0].Equals("interpolationTPS")) interpolationTPS = int.Parse(split[1]);
+                else if (split[0].Equals("useInterpolation")) useInterpolation = split[1].Equals("true");
+                else if (split[0].Equals("seekAhead")) Extrapolate.extrapolationRatio = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("useSmoothCorners")) Aruco.useSmoothCorners = split[1].Equals("true");
                 else if (split[0].Equals("cornersMaxDistance")) Aruco.cornersMaxDistance = int.Parse(split[1]);
                 else if (split[0].Equals("cornersSmoothFactor")) Aruco.cornersSmoothFactor = float.Parse(split[1], any, invariantCulture);

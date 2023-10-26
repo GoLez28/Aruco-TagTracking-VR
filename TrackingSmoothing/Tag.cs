@@ -374,6 +374,15 @@ namespace TrackingSmoothing {
                 trackerss.Add(currentTracker);
             }
             trackers = trackerss.ToArray();
+            //Extrapolation
+            if (Program.useInterpolation) {
+                Extrapolate.interruptFlag = true;
+                System.Threading.Thread.Sleep(100);
+                Extrapolate.trackers = new Extrapolate.Tracker[trackers.Length];
+                for (int j = 0; j < trackers.Length; j++) {
+                    Extrapolate.trackers[j] = new Extrapolate.Tracker(new Vector3(), Quaternion.Identity, j);
+                }
+            }
             SetFinalTrackers(Program.postNoise == 2 ? 0.5f : 1f);
 
             combinedTrackers = new();
@@ -881,13 +890,17 @@ namespace TrackingSmoothing {
                     Vector3 e = ToEulerAngles(q);
                     Program.oscClient.Send($"/tracking/trackers/{i + 1}/rotation", e.X, e.Z, e.Y);
                 } else {
-                    Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
-                                                pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
-                                                -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
-                    if (Program.debugSendTrackerOSC) {
-                        Program.oscClientDebug.Send("/debug/final/position", i + 1,
-                                               pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
-                                               -q.X, -q.Z, -q.Y, q.W);
+                    if (Program.useInterpolation) {
+                        Extrapolate.trackers[i].UpdatePos(pos, q, i);
+                    } else {
+                        Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
+                                                    pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
+                                                    -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
+                        if (Program.debugSendTrackerOSC) {
+                            Program.oscClientDebug.Send("/debug/final/position", i + 1,
+                                                   pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
+                                                   -q.X, -q.Z, -q.Y, q.W);
+                        }
                     }
                 }
             }
