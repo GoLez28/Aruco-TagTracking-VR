@@ -883,6 +883,7 @@ namespace TrackingSmoothing {
                 score *= noiseRed;
                 if (dynamicFiltering)
                     UpdateFinalTrackerParams(i, score);
+                if (Program.debugShowCamerasPosition && Program.debugTrackerToBorrow == i) continue;
                 Vector3 pos = finals[i].fpos;
                 Quaternion q = finals[i].frot;
                 if (Program.useVRChatOSCTrackers) {
@@ -901,6 +902,24 @@ namespace TrackingSmoothing {
                                                    pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
                                                    -q.X, -q.Z, -q.Y, q.W);
                         }
+                    }
+                }
+            }
+            if (!Program.useVRChatOSCTrackers) {
+                if (Program.debugShowCamerasPosition) {
+                    int t = Program.debugTrackerToBorrow;
+                    int c = (int)(Program.timer.ElapsedMilliseconds / 125) % cameras.Length;
+                    Matrix4x4 nullPos = cameras[c].matrix;
+                    nullPos = Matrix4x4.Multiply(nullPos, Program.offsetMat);
+                    Vector3 pos = nullPos.Translation;
+                    Quaternion q = Quaternion.Identity;
+                    Program.oscClient.Send("/VMT/Room/Unity", t + 1, 1, 0f,
+                                                    pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
+                                                    -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
+                    if (Program.debugSendTrackerOSC) {
+                        Program.oscClientDebug.Send("/debug/final/position", t + 1,
+                                               pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
+                                               -q.X, -q.Z, -q.Y, q.W);
                     }
                 }
             }

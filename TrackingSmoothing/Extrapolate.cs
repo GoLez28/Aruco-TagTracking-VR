@@ -174,6 +174,7 @@ namespace TrackingSmoothing {
                 System.Diagnostics.Stopwatch extrapolateIdleWorkBenchmark = new System.Diagnostics.Stopwatch();
                 extrapolateIdleWorkBenchmark.Start();
                 for (int i = 0; i < trackers.Length; i++) {
+                    if (Program.debugShowCamerasPosition && Program.debugTrackerToBorrow == i) continue;
                     (Vector3 pos, Quaternion q) = trackers[i].GetEstimatedPosition();
                     //Quaternion q = trackers[i].rotation;
                     Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,

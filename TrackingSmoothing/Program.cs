@@ -63,6 +63,8 @@ namespace TrackingSmoothing {
         public static bool useVRChatOSCTrackers = false;
         public static bool sendHeadTracker = true;
         public static bool debugSendTrackerOSC = false;
+        public static bool debugShowCamerasPosition = false;
+        public static int debugTrackerToBorrow = 0;
 
         public static Stopwatch timer = new Stopwatch();
         public static int nextSave = 10;
@@ -486,27 +488,27 @@ namespace TrackingSmoothing {
                 offsetMat.M42 += 0.01f;
                 Console.WriteLine($"Increased Z offset {offsetMat.M42}");
             } else if (key == ConsoleKey.E) {
-                rotationY -= 0.03f;
+                rotationY -= 0.02f;
                 Console.WriteLine($"Decreased Yaw offset {rotationY}");
                 ApplyOffset();
             } else if (key == ConsoleKey.R) {
-                rotationY += 0.03f;
+                rotationY += 0.02f;
                 Console.WriteLine($"Increased Yaw offset {rotationY}");
                 ApplyOffset();
             } else if (key == ConsoleKey.D) {
-                rotationX -= 0.03f;
+                rotationX -= 0.02f;
                 Console.WriteLine($"Decreased xRot offset {rotationX}");
                 ApplyOffset();
             } else if (key == ConsoleKey.F) {
-                rotationX += 0.03f;
+                rotationX += 0.02f;
                 Console.WriteLine($"Increased xRot offset {rotationX}");
                 ApplyOffset();
             } else if (key == ConsoleKey.C) {
-                rotationZ -= 0.03f;
+                rotationZ -= 0.02f;
                 Console.WriteLine($"Decreased zRot offset {rotationZ}");
                 ApplyOffset();
             } else if (key == ConsoleKey.V) {
-                rotationZ += 0.03f;
+                rotationZ += 0.02f;
                 Console.WriteLine($"Increased zRot offset {rotationZ}");
                 ApplyOffset();
             } else if (key == ConsoleKey.D9) {
@@ -516,6 +518,9 @@ namespace TrackingSmoothing {
                 Console.Clear();
                 Console.WriteLine();
                 ShowHint();
+            } else if (key == ConsoleKey.D6) {
+                debugShowCamerasPosition = !debugShowCamerasPosition;
+                Console.WriteLine($"Show Cameras as tracker: " + Show(debugShowCamerasPosition));
             } else if (key == ConsoleKey.D7) {
                 debugSendTrackerOSC = !debugSendTrackerOSC;
                 Console.WriteLine($"Send Debug Trackers: " + Show(debugSendTrackerOSC));
