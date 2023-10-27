@@ -70,6 +70,10 @@ namespace TrackingSmoothing {
         public static Valve.VR.HmdMatrix34_t prevCont = new();
         public static int frameCount = 0;
         public static string infoBarWarning = "";
+
+        public static bool showThreadsMS = false;
+        public static double[] threadsWorkTime = new double[4];
+        public static double[] threadsIdleTime = new double[4];
         static void Main(string[] args) {
             /////////////////////////////////////////////////
             ///TODO:    Fix all this crap of laggy code
@@ -95,6 +99,8 @@ namespace TrackingSmoothing {
             }
 
             ReadConfig();
+            threadsWorkTime = new double[2 + Tag.cameras.Length]; //1. main, 2. extrapolate 3+. cameras
+            threadsIdleTime = new double[2 + Tag.cameras.Length];
 
             //initialize OSC Sender
             oscClient = new uOscClient();
@@ -130,6 +136,8 @@ namespace TrackingSmoothing {
         }
 
         private static double UpdateLoop(Application app, double previousTime) {
+            Stopwatch mainThreadBenchmark = new Stopwatch();
+            mainThreadBenchmark.Start();
             double delta = timer.Elapsed.TotalMilliseconds - previousTime;
             previousTime = timer.Elapsed.TotalMilliseconds;
             if (frameCount % 10 == 0) {
@@ -159,6 +167,16 @@ namespace TrackingSmoothing {
                 infoBarWarning = "";
                 for (int i = Console.CursorLeft; i < Console.WindowWidth; i++) {
                     Console.Write(" ");
+                }
+                for (int i = 0; i < threadsWorkTime.Length; i++) {
+                    Console.SetCursorPosition(0, ypos + 1 + i);
+                    if (i == 0) Console.Write("main");
+                    else if (i == 1) Console.Write("interpolate");
+                    else Console.Write($"camera {i - 2}");
+                    Console.Write($": work {threadsWorkTime[i]:0.0000}ms / idle {threadsIdleTime[i]:0.0000}ms");
+                    for (int j = Console.CursorLeft; j < Console.WindowWidth; j++) {
+                        Console.Write(" ");
+                    }
                 }
                 Console.SetCursorPosition(x, y);
                 Console.ResetColor();
@@ -296,8 +314,13 @@ namespace TrackingSmoothing {
                 autoOffset = false;
                 Console.WriteLine("Adjusted offsets");
             }
+            mainThreadBenchmark.Stop();
+            threadsWorkTime[0] = mainThreadBenchmark.Elapsed.TotalMilliseconds;
+            mainThreadBenchmark.Restart();
             //A mimir, wait for next frame (80fps)
             System.Threading.Thread.Sleep(1000 / updateFPS);
+            mainThreadBenchmark.Stop();
+            threadsIdleTime[0] = mainThreadBenchmark.Elapsed.TotalMilliseconds;
 
             var mm = devPos[3].mDeviceToAbsoluteTracking;
             frameCount++;
@@ -371,6 +394,10 @@ namespace TrackingSmoothing {
         }
 
         static void ShowHint() {
+            if (showThreadsMS)
+                for (int i = 0; i < threadsWorkTime.Length; i++) {
+                    Console.WriteLine();
+                }
             Console.WriteLine($"\n[D8] Reset Trackers (VMT)\n[Space] Show Hints\n[D1] Calibrate Cameras\n[D2] Manual Offset Adjust: {Show(adjustOffset)}" +
                 $"\n[D3] Reload Offsets\n[D4] Reloaded Config/Trackers\n[D5] Auto Adjust Offsets\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}\n[D9] Show Camera Windows\n[D0] Clear Console" +
                 $"\n[M] Pre-Pose Noise Reduction: {(preNoise == 0 ? "Disabled" : preNoise == 1 ? "Enabled" : "Smooth rects off")}\n[N] Post-Pose Noise Reduction: {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}" +
@@ -662,6 +689,7 @@ namespace TrackingSmoothing {
                 else if (split[0].Equals("cornersMaxDistance")) Aruco.cornersMaxDistance = int.Parse(split[1]);
                 else if (split[0].Equals("cornersSmoothFactor")) Aruco.cornersSmoothFactor = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("refineSearch")) Tag.refineSearch = split[1].Equals("true");
+                else if (split[0].Equals("showThreadsTime")) showThreadsMS = split[1].Equals("true");
                 else if (split[0].Equals("refineIterations")) Tag.refineIterations = int.Parse(split[1]);
                 else if (split[0].Equals("dynamicFiltering")) Tag.dynamicFiltering = split[1].Equals("true");
                 else if (split[0].Equals("tagsToCalibrate")) {

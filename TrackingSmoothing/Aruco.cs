@@ -143,6 +143,9 @@ namespace TrackingSmoothing {
         public static void Update(int c) {
             int frameCount = 0;
             while (true) {
+                System.Diagnostics.Stopwatch arucoThreadWorkBenchmark = new System.Diagnostics.Stopwatch();
+                System.Diagnostics.Stopwatch arucoThreadIdleBenchmark = new System.Diagnostics.Stopwatch();
+                arucoThreadWorkBenchmark.Start();
                 frameCount++;
                 if (Program.wantToCloseWindows) {
                     CvInvoke.DestroyAllWindows();
@@ -155,6 +158,8 @@ namespace TrackingSmoothing {
                     Console.WriteLine("Wait... this is illegal");
                 }
                 System.Diagnostics.Debug.WriteLine(c);
+                arucoThreadWorkBenchmark.Stop();
+                arucoThreadIdleBenchmark.Start();
                 while (true) {
                     frame = capture[c].QueryFrame();
                     if (Tag.cameras[c].skipFrameCount >= Tag.cameras[c].skipFrames) {
@@ -163,6 +168,8 @@ namespace TrackingSmoothing {
                     }
                     Tag.cameras[c].skipFrameCount++;
                 }
+                arucoThreadIdleBenchmark.Stop();
+                arucoThreadWorkBenchmark.Start();
                 bool correctRes = Tag.cameras[c].rsHeight > 10 && Tag.cameras[c].rsWidth > 10;
                 if (correctRes) {
                     int newWidth = Tag.cameras[c].rsWidth;
@@ -324,6 +331,9 @@ namespace TrackingSmoothing {
                 }
                 Tag.cameras[c].newData = true;
                 Tag.newInfoReady = true;
+                arucoThreadWorkBenchmark.Stop();
+                Program.threadsWorkTime[c + 2] = arucoThreadWorkBenchmark.Elapsed.TotalMilliseconds;
+                Program.threadsIdleTime[c + 2] = arucoThreadIdleBenchmark.Elapsed.TotalMilliseconds;
             }
 
             static void SendDetectedRect(int c, Mat frame, VectorOfInt ids, VectorOfVectorOfPointF corners, int altCorner, Mat tvecs0) {

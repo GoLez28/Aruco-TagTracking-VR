@@ -160,6 +160,8 @@ namespace TrackingSmoothing {
         static public bool interruptFlag = true;
         static public void UpdateLoop() {
             while (true) {
+                System.Diagnostics.Stopwatch extrapolateIdleLoopBenchmark = new System.Diagnostics.Stopwatch();
+                extrapolateIdleLoopBenchmark.Start();
                 if (interruptFlag) {
                     System.Threading.Thread.Sleep(1000);
                     interruptFlag = false;
@@ -168,6 +170,9 @@ namespace TrackingSmoothing {
                     System.Threading.Thread.Sleep(1000);
                     continue;
                 }
+                extrapolateIdleLoopBenchmark.Stop();
+                System.Diagnostics.Stopwatch extrapolateIdleWorkBenchmark = new System.Diagnostics.Stopwatch();
+                extrapolateIdleWorkBenchmark.Start();
                 for (int i = 0; i < trackers.Length; i++) {
                     (Vector3 pos, Quaternion q) = trackers[i].GetEstimatedPosition();
                     //Quaternion q = trackers[i].rotation;
@@ -180,7 +185,15 @@ namespace TrackingSmoothing {
                                                -q.X, -q.Z, -q.Y, q.W);
                     }
                 }
+
+                extrapolateIdleWorkBenchmark.Stop();
+                Program.threadsWorkTime[1] = extrapolateIdleWorkBenchmark.Elapsed.TotalMilliseconds;
+                extrapolateIdleLoopBenchmark.Start();
+
                 System.Threading.Thread.Sleep(1000 / Program.interpolationTPS);
+
+                extrapolateIdleLoopBenchmark.Stop();
+                Program.threadsIdleTime[1] = extrapolateIdleLoopBenchmark.Elapsed.TotalMilliseconds;
             }
         }
         static float getAngle(float[] a, float[] b) {
