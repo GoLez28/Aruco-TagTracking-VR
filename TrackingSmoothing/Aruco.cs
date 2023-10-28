@@ -229,9 +229,9 @@ namespace TrackingSmoothing {
                     //}
                 }
                 //if (c == 0)
-                //    frame = new Mat(@"C:\Users\\Videos\iVCam\2023-08-01 222744.jpg");
+                //    frame = new Mat(@"C:\Users\\Videos\iVCam\.jpg");
                 //if (c == 1
-                //    frame = new Mat(@"C:\Users\\Videos\iVCam\2023-08-01 222749.jpg");
+                //    frame = new Mat(@"C:\Users\\Videos\iVCam\.jpg");
 
 
                 //frame *= 2f;
