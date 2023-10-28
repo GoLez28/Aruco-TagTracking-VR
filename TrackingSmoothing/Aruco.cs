@@ -448,7 +448,7 @@ namespace TrackingSmoothing {
 
         //TODO: add multiple camera support
         static int[] queueCount = new int[3];
-        static int maxQueue = 30;
+        static int maxQueue = 55;
         static float[][] sclQueue = new float[][] { new float[maxQueue], new float[maxQueue] };
         static VectorOfDouble[][] posQueue = new VectorOfDouble[][] { new VectorOfDouble[maxQueue], new VectorOfDouble[maxQueue] };
         static VectorOfDouble[][] rotQueue = new VectorOfDouble[][] { new VectorOfDouble[maxQueue], new VectorOfDouble[maxQueue] };
