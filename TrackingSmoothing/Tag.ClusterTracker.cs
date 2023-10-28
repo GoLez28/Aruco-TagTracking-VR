@@ -39,7 +39,7 @@ namespace TrackingSmoothing {
             int ghost = 0; //cheap way to avoid all uppdateCount at 0 and crash
 
             public float rotationComparison = 0.95f;
-            public float straightTrackerWeight = 0.8f;
+            public float straightTrackerWeight = 1.5f;
 
             public float trackerFollowWeight = 0.0f;
 
@@ -608,7 +608,7 @@ namespace TrackingSmoothing {
                             min = (float)Math.Max(min, 0);
                             if (trackerPresence[i] < min)
                                 trackerPresence[i] = min;
-                            trackerPresence[i] = min;
+                            //trackerPresence[i] = min;
                         }
                     }
                 }
@@ -664,7 +664,7 @@ namespace TrackingSmoothing {
                             trackerPresence[i] += straightTrackerWeight * 2;
                             if (trackerPresence[i] > 100)
                                 trackerPresence[i] = 100;
-                            trackerPresence[i] = 100;
+                            //trackerPresence[i] = 100;
                         }
                     }
                 }
