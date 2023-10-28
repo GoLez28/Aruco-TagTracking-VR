@@ -134,6 +134,18 @@ namespace TrackingSmoothing {
             }
             interpolationThread = new System.Threading.Thread(() => Extrapolate.UpdateLoop());
             interpolationThread.Start();
+#if DEBUG
+            debugSendTrackerOSC = true;
+            if (debugSendTrackerOSC) {
+                if (!oscClientDebug.isRunning) {
+                    oscClientDebug.StartClient();
+                }
+            } else {
+                if (oscClientDebug.isRunning) {
+                    oscClientDebug.StopClient();
+                }
+            }
+#endif
             while (true) previousTime = UpdateLoop(app, previousTime);
         }
 
