@@ -182,14 +182,16 @@ namespace TrackingSmoothing {
                 for (int i = Console.CursorLeft; i < Console.WindowWidth; i++) {
                     Console.Write(" ");
                 }
-                for (int i = 0; i < threadsWorkTime.Length; i++) {
-                    Console.SetCursorPosition(0, ypos + 1 + i);
-                    if (i == 0) Console.Write("main");
-                    else if (i == 1) Console.Write("interpolate");
-                    else Console.Write($"camera {i - 2}");
-                    Console.Write($": work {threadsWorkTime[i]:0.0000}ms / idle {threadsIdleTime[i]:0.0000}ms");
-                    for (int j = Console.CursorLeft; j < Console.WindowWidth; j++) {
-                        Console.Write(" ");
+                if (showThreadsMS) {
+                    for (int i = 0; i < threadsWorkTime.Length; i++) {
+                        Console.SetCursorPosition(0, ypos + 1 + i);
+                        if (i == 0) Console.Write("main");
+                        else if (i == 1) Console.Write("interpolate");
+                        else Console.Write($"camera {i - 2}");
+                        Console.Write($": work {threadsWorkTime[i]:0.0000}ms / idle {threadsIdleTime[i]:0.0000}ms");
+                        for (int j = Console.CursorLeft; j < Console.WindowWidth; j++) {
+                            Console.Write(" ");
+                        }
                     }
                 }
                 Console.SetCursorPosition(x, y);
