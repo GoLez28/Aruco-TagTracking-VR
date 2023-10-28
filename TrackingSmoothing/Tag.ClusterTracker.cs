@@ -608,6 +608,7 @@ namespace TrackingSmoothing {
                             min = (float)Math.Max(min, 0);
                             if (trackerPresence[i] < min)
                                 trackerPresence[i] = min;
+                            trackerPresence[i] = min;
                         }
                     }
                 }
@@ -663,6 +664,7 @@ namespace TrackingSmoothing {
                             trackerPresence[i] += straightTrackerWeight * 2;
                             if (trackerPresence[i] > 100)
                                 trackerPresence[i] = 100;
+                            trackerPresence[i] = 100;
                         }
                     }
                 }
@@ -675,20 +677,16 @@ namespace TrackingSmoothing {
                         //if (!float.IsNaN(estimatedRot[i].X) && !float.IsNaN(estimatedPos[i].X) && (Program.frameCount / 8) % 2 == 0)
                         //    Aruco.DrawAxis(prevMat[i], Utils.GetMap(trackerPresence[i], 0, 100, 1f, 0.2f));
                     }
-                if (final)
-                    for (int i = 0; i < estimatedRot.Length; i++) {
-                        Quaternion filteredRot = trackersRotationsFilter[i].Filter(estimatedRot[i]);
-                        if (float.IsNaN(filteredRot.X)) {
-                            if (trackerName.Equals("waist")) {
-                                trackersRotationsFilter[i] = new OneEuroFilter<Quaternion>(25);
-                            } else {
-                                trackersRotationsFilter[i] = new OneEuroFilter<Quaternion>(2);
-                            }
-                            Console.WriteLine("recenter for " + trackerIndex[i] + " " + Program.frameCount);
-                            continue;
-                        }
-                        estimatedRot[i] = filteredRot;
-                    }
+                //if (final)
+                //    for (int i = 0; i < estimatedRot.Length; i++) {
+                //        Quaternion filteredRot = trackersRotationsFilter[i].Filter(estimatedRot[i]);
+                //        if (float.IsNaN(filteredRot.X)) {
+                //            trackersRotationsFilter[i] = new OneEuroFilter<Quaternion>(trackersRotationsFilter[i].freq);
+                //            //Console.WriteLine("recenter for " + trackerIndex[i] + " " + Program.frameCount);
+                //            continue;
+                //        }
+                //        estimatedRot[i] = filteredRot;
+                //    }
 
                 Quaternion[] rots = new Quaternion[estimatedRot.Length];
 
