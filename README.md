@@ -1,13 +1,16 @@
 # TagTracking (WIP)
-Aruco tracking for steamvr
+Aruco tag tracking for SteamVR  
+(VRChat's OSC not supported)
 
-requires 2 cameras, some tags printed, and VMT installed
+requires 2 cameras (1 or more than 2 can also work), some tags printed, and VMT installed (https://github.com/gpsnmeajp/VirtualMotionTracker)
 
 How to use: 
 
-More in-depth tutorial here: (spanish) https://github.com/GoLez28/TagTracking/blob/master/tutorial/es.md
+More in-depth tutorial here: (spanish) https://github.com/GoLez28/TagTracking/blob/master/tutorial/es.md  
 
-Calibrate the cameras by putting tag 0, 2, 4, 6, (can be changed in the config file) on the floor, the tag 0 will be the direction on steamvr, then press [1] to start calibrating (a value of less than 0.3 is good enough) (charuco board not supported yet), you can see the calibration in depth by pressing [7] to open the scene view window, pressing any key in it, will change what you see, being in "Raw trackers" let you see what the cameras see.   
+For now camera calibration is not supported, so use Ju1ces April Tags (https://github.com/ju1ce/April-Tag-VR-FullBody-Tracker) to calibrate camera, and copy the values from the yaml config file to the xmls in the app
+
+Camera position can be estimated by pressing [1] and then pressing [2] while moving arround to add to the list, the tag 0 must be visible when finishing calibration by pressing [1] as this will be the direction on steamvr (charuco board not supported yet), you can see the calibration in depth by pressing [7] to open the scene view window, pressing any key in it, will change what you see, being in "Raw trackers" let you see what the cameras see.   
 Size of the trackers must be specified on the 'config.txt' file (trackerSize=[number]). Then adjust the offset of the room using the right controller by pressing [2] to toggle
 
 parameters and shape of the trackers must be speciefied in 'trackers.txt', each tracker parameters layout is like following:
