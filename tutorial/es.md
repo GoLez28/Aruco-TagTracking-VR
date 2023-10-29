@@ -85,7 +85,7 @@ cuando ya creas que son suficientes tags registrados, asegurate de que el tag nu
 eso calibrara las camaras, pero no la posicion de los trackers, si ves que los trackers se agitan / tiritan mucho, es posible que la calibracion no fue muy buena y tenga que hacerse de nuevo,  
 o de que la camara entrega un resultado muy ruidoso.  
 
-Una vez con las camara calibradas, parate derecho y presiona '5' para que haga una estimacion de donde deberian estar los trackers, si quedas insatifecho con los resultados (o sea siempre xD), puedes pretar '2' para mover el espacio, presionando la empuñadura derecha (o 'p') mueves la posicion, y presionando el gatillo derecho (o 'o') mueves la direccion del espacio. Tambien puedes usar el teclado para refinar la posiciones, 'q','w','a','s','z','x' para cambiar la posicion y 'e','r','d','f','c','v' para cambiar la rotacion, asegurate de que el cuadrado este "dentro" de tu pierna, (o donde se supone donde lo dejaste en 'trackers.txt').  
+Una vez con las camara calibradas, parate derecho y presiona '5' para que haga una estimacion de donde deberian estar los trackers, si quedas insatifecho con los resultados (o sea siempre xD), puedes pretar '2' para mover el espacio, presionando la empuñadura derecha (o 'P') mueves la posicion, y presionando el gatillo derecho (o 'O') mueves la direccion del espacio. Tambien puedes usar el teclado para refinar la posiciones, 'Q','W','A','S','Z','X' para cambiar la posicion y 'E','R','D','F','C','V' para cambiar la rotacion, asegurate de que el cuadrado este "dentro" de tu pierna, (o donde se supone donde lo dejaste en 'trackers.txt').  
 
 Felicitaciones, los trackers deberian estar funcionando.  
 
