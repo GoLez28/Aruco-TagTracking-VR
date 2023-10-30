@@ -6,7 +6,7 @@ NetAddress myRemoteLocation;
 
 void setup() {
   size(800, 800, P3D);
-  frameRate(25);
+  frameRate(60);
   noSmooth();
   oscP5 = new OscP5(this, 15460);
   myRemoteLocation = new NetAddress("127.0.0.1", 15460);
