@@ -24,3 +24,7 @@ filterSmoothRot is how smooth it will turn
 filterSmoothPos is how smooth it will move
 
 example in the files
+
+
+https://github.com/GoLez28/TagTracking/assets/15484340/968b5222-90e1-4f15-a05d-14d728cc2c7a
+
