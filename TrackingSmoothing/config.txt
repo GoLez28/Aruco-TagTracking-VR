@@ -1,4 +1,7 @@
-updatesPerSecond=60
+updatesPerSecond=30
+interpolationTPS=80
+useInterpolation=true
+seekAhead=0.25
 trackerDelay=250
 trackerSize=63
 poseAdjust=true
