@@ -10,6 +10,9 @@ namespace TrackingSmoothing {
         public static float GetDistance(float[] a, float[] b) {
             return GetDistance(a[0], a[1], a[2], b[0], b[1], b[2]);
         }
+        public static float GetDistance(Vector3 a, Vector3 b) {
+            return GetDistance(a.X, a.Y, a.Z, b.X, b.Y, b.Z);
+        }
         public static float GetDistance(float x1, float y1, float z1, float x2, float y2, float z2) {
             return (float)Math.Sqrt(
                 Math.Pow(x1 - x2, 2) +

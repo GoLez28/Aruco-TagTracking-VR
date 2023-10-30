@@ -8,11 +8,6 @@ using System.Threading.Tasks;
 namespace TrackingSmoothing {
     static class Extrapolate {
         public class Tracker {
-            static float velRangeStart = 0.01f;
-            static float velRangeEnd = 0.1f;
-            static float velMapStart = -1f;
-            static float velMapEnd = -0.25f;
-
             List<Vector3> posList = new();
             List<Quaternion> rotList = new();
             double lastTimeNewPos = 0;
@@ -24,7 +19,6 @@ namespace TrackingSmoothing {
             public int inactiveSince = 0;
             Vector3 lastPosGiven = new();
             Quaternion lastRotGiven = Quaternion.Identity;
-            float speedometer = -1;
             public Tracker(Vector3 pos, Quaternion rot, int i) {
                 UpdatePos(pos, rot, i);
             }
@@ -33,16 +27,7 @@ namespace TrackingSmoothing {
                 index = i;
                 enableTracker = 1;
                 timeOffset = 0;
-                //if (legsFolded) {
-                //    for (int i = 0; i < 4; i++) {
-                //        rotation[i] += (newRot[i] - rotation[i]) * 0.1f;
-                //    }
-                //} else {
-                //    rotation = newRot;
-                //}
                 rotation = rot;
-                //if (trackingBase.equals("/VMT/Follow/Unity"))
-                //    trackbase = (String)info[10];
                 posList.Add(pos);
                 rotList.Add(rot);
                 lastTimeNewPos = Program.timer.Elapsed.TotalMilliseconds;
@@ -69,9 +54,9 @@ namespace TrackingSmoothing {
                 if (posList.Count() < 3) {
                     if (posList.Count() == 0)
                         return (new Vector3(), Quaternion.Identity);
-                    Vector3 last = posList[posList.Count() - 1];
-                    Quaternion lastR = rotList[rotList.Count() - 1];
-                    return (last, lastR);
+                    Vector3 lastP = posList[posList.Count - 1];
+                    Quaternion lastR = rotList[rotList.Count - 1];
+                    return (lastP, lastR);
                 }
                 int size = posList.Count();
                 Vector3 pm3, pm2, pm1;
@@ -92,52 +77,12 @@ namespace TrackingSmoothing {
                     Console.WriteLine("Something went wrong getting rotList in getEstimatedPosition(): " + e);
                     return (lastPosGiven, lastRotGiven);
                 }
-                //if (index == 0)
-                //  println(pm1.y);
-                if (index == 0) {
-                    if (pm1.Y > -0.65) {
-                        //println("SEATEDaaaaaaaaaaaaaaaaaa");
-                        //waistIsBelowThreshold = true;
-                    } else {
-                        //waistIsBelowThreshold = false;
-                    }
-                }
-                float velocity1 = Utils.GetDistance(pm1.X, pm1.Y, pm1.Z, pm2.X, pm2.Y, pm2.Z);
-                float velocity2 = Utils.GetDistance(pm2.X, pm2.Y, pm2.Z, pm3.X, pm3.Y, pm3.Z);
-                //float velocity3 = dist(pm1.X, pm1.Y, pm1.Z, pm3.X, pm3.Y, pm3.Z);
-                //if (legsFolded) {
-                //    pm1.X = (pm1.X + pm2.X) * 0.5f;
-                //    pm1.Y = (pm1.Y + pm2.Y) * 0.5f;
-                //    pm1.Z = (pm1.Z + pm2.Z) * 0.5f;
 
-                //    pm2.X = (pm3.X + pm2.X) * 0.5f;
-                //    pm2.Y = (pm3.Y + pm2.Y) * 0.5f;
-                //    pm2.Z = (pm3.Z + pm2.Z) * 0.5f;
-                //}
-                //float acc = -1;
-                //if (velocity1 - velocity2 > velRangeStart && velocity2 > velRangeStart) {
-                //    //println(velocity1 - velocity2, velocity1, velocity2);
-                //    acc = Utils.GetMap(velocity1 - velocity2, velRangeStart, velRangeEnd, velMapStart, velMapEnd);
-                //    if (acc > speedometer)
-                //        speedometer = acc;
-                //    //triggeredVel = true;          THIS NEEDS TO BE REVIEWED -----------------------------------------------------------
-                //}
-                ////println(speedometer);
-                //speedometer -= 0.005f;
-                //speedometer = Math.Min(Math.Max(speedometer, velMapStart), velMapEnd);
-                //if (legsFolded) {
-                //    speedometer = velMapStart;
-                //}
                 float seekAhead = extrapolationRatio - 1f;
                 double timeSinceNewPos = Program.timer.Elapsed.TotalMilliseconds - lastTimeNewPos;
                 float seekPos = (float)(timeSinceNewPos / (1000f / Program.updateFPS) + seekAhead);
                 seekPos = Math.Min(seekPos, 1.5f);
-                Vector3 finalPred = CurveExtra(new float[][] { new float[] { pm3.X, pm3.Y, pm3.Z }, new float[] { pm2.X, pm2.Y, pm2.Z }, new float[] { pm1.X, pm1.Y, pm1.Z } }, seekPos);
-                //if (legsFolded) {
-                //    lastPosGiven.X += (finalPred.X - lastPosGiven.X) * 0.3;
-                //    lastPosGiven.Y += (finalPred.Y - lastPosGiven.Y) * 0.3;
-                //    lastPosGiven.Z += (finalPred.Z - lastPosGiven.Z) * 0.3;
-                //} else {
+                Vector3 finalPred = CurveExtra(new Vector3[] { pm3, pm2, pm1 }, seekPos);
                 lastPosGiven.X = finalPred.X;
                 lastPosGiven.Y = finalPred.Y;
                 lastPosGiven.Z = finalPred.Z;
@@ -197,68 +142,50 @@ namespace TrackingSmoothing {
                 Program.threadsIdleTime[1] = extrapolateIdleLoopBenchmark.Elapsed.TotalMilliseconds;
             }
         }
-        static float getAngle(float[] a, float[] b) {
-            float angL = GetAngleBetween(new float[] { 1, 0, 0 }, new float[] { a[0] - b[0], a[1] - b[1], a[2] - b[0] });
-            //if (b[1] > a[1]) angL = -angL;
-            return angL;
-        }
         //THIS IS A MADE UP EXTRAPOLATION METHOD, DO NOT COPY, IT IS BAD LOL
-        public static Vector3 CurveExtra(float[][] points, float dist) {
-
+        public static Vector3 CurveExtra(Vector3[] points, float dist) {
             float curviness = 0.7f;
 
             if (dist < 0) {
-                float x = points[2][0] - points[1][0];
-                float y = points[2][1] - points[1][1];
-                float z = points[2][2] - points[1][2];
+                float x = points[2].X - points[1].X;
+                float y = points[2].Y - points[1].Y;
+                float z = points[2].Z - points[1].Z;
                 float revD = dist + 1;
                 return new Vector3(
-                  points[1][0] + x * revD,
-                  points[1][1] + y * revD,
-                  points[1][2] + z * revD
+                  points[1].X + x * revD,
+                  points[1].Y + y * revD,
+                  points[1].Z + z * revD
                 );
             }
 
-            float[][] dX = new float[][] { new float[] { 1, points[1][0] }, new float[] { 2, points[2][0] } };
+            float[][] dX = new float[][] { new float[] { 1, points[1].X }, new float[] { 2, points[2].X } };
             float pX = LinearExtrapolate(dX, 3.0f);
-            float[][] dY = new float[][] { new float[] { 1, points[1][1] }, new float[] { 2, points[2][1] } };
+            float[][] dY = new float[][] { new float[] { 1, points[1].Y }, new float[] { 2, points[2].Y } };
             float pY = LinearExtrapolate(dY, 3.0f);
-            float[][] dZ = new float[][] { new float[] { 1, points[1][2] }, new float[] { 2, points[2][2] } };
+            float[][] dZ = new float[][] { new float[] { 1, points[1].Z }, new float[] { 2, points[2].Z } };
             float pZ = LinearExtrapolate(dZ, 3.0f);
-            float[] pr = new float[] { pX, pY, pZ };
-            //fill(0, 255, 0);
-            //ellipse(predicted.x, predicted.y, 10, 10);
+            Vector3 pr = new(pX, pY, pZ);
 
-            //float pM = dist(points[2][0], points[2][1], points[2][2], predicted.x, predicted.y, predicted.z);
-            //float pM = (float)Math.Sqrt(Math.Pow(points[2][0] - pr[0], 2) + Math.Pow(points[2][1] - pr[1], 2) + Math.Pow(points[2][2] - pr[2], 2));
             float pM = Utils.GetDistance(pr, points[2]);
-            //float[] mid = new float[] {(points[0][0] + points[2][0]) * 0.5f, (points[0][1] + points[2][1]) * 0.5f, (points[0][2] + points[2][2]) * 0.5f};
             float[] mid = new float[] {
-                points[0][0] * 0.9f + points[2][0] * 0.1f,
-                points[0][1] * 0.9f + points[2][1] * 0.1f,
-                points[0][2] * 0.9f + points[2][2] * 0.1f
+                points[0].X * 0.9f + points[2].X * 0.1f,
+                points[0].Y * 0.9f + points[2].Y * 0.1f,
+                points[0].Z * 0.9f + points[2].Z * 0.1f
             };
             float curve = (1 + dist * curviness);
-            mid[0] -= (mid[0] - points[1][0]) * curve;
-            mid[1] -= (mid[1] - points[1][1]) * curve;
-            mid[2] -= (mid[2] - points[1][2]) * curve;
-            //fill(25, 25, 25);
-            //ellipse(mid[0], mid[1], 3, 3);
+            mid[0] -= (mid[0] - points[1].X) * curve;
+            mid[1] -= (mid[1] - points[1].Y) * curve;
+            mid[2] -= (mid[2] - points[1].Z) * curve;
             float[] newPred = new float[] {
-                points[2][0]-mid[0],
-                points[2][1]-mid[1],
-                points[2][2]-mid[2]
+                points[2].X-mid[0],
+                points[2].Y-mid[1],
+                points[2].Z-mid[2]
             };
-            //fill(0, 0, 127);
-            //ellipse(newPred[0], newPred[1], 3, 3);
             float mag = GetMag(newPred[0], newPred[1], newPred[2]);
-            //float mag2 = dist(0, 0, newPred[0], newPred[1]);
             float d = (pM * dist);
-            newPred[0] = points[2][0] + ((newPred[0] / mag) * d);
-            newPred[1] = points[2][1] + ((newPred[1] / mag) * d);
-            newPred[2] = points[2][2] + ((newPred[2] / mag) * d);
-            //newPred[0] *= pM * dist;
-            //newPred[1] *= pM * dist;
+            newPred[0] = points[2].X + ((newPred[0] / mag) * d);
+            newPred[1] = points[2].Y + ((newPred[1] / mag) * d);
+            newPred[2] = points[2].Z + ((newPred[2] / mag) * d);
             return new Vector3(newPred[0], newPred[1], newPred[2]);
         }
         static float GetMag(float x, float y, float z) {
@@ -266,29 +193,8 @@ namespace TrackingSmoothing {
             return (float)Math.Sqrt(x * x + y * y + z * z);
         }
         static float LinearExtrapolate(float[][] d, float x) {
-            float y = d[0][1] + (x - d[0][0]) / (d[1][0] - d[0][0]) * (d[1][1] - d[0][1]);
+            float y = d[0][1] + (x - 1) / (2 - 1) * (d[1][1] - d[0][1]);
             return y;
-        }
-        static float GetAngleBetween(float[] v1, float[] v2) {
-            //From Processing
-            if (v1[0] == 0 && v1[1] == 0 && v1[2] == 0) return 0.0f;
-            if (v2[0] == 0 && v2[1] == 0 && v2[2] == 0) return 0.0f;
-
-            double dot = v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
-            double v1mag = Math.Sqrt(v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2]);
-            double v2mag = Math.Sqrt(v2[0] * v2[0] + v2[1] * v2[1] + v2[2] * v2[2]);
-            double amt = dot / (v1mag * v2mag);
-            if (amt <= -1) {
-                return 3.14159265f;
-            } else if (amt >= 1) {
-                return 0;
-            }
-            return (float)Math.Acos(amt);
-        }
-        static float[] FromAngle(float angle) {
-            //From Processing
-            float[] target = new float[] { (float)Math.Cos(angle), (float)Math.Sin(angle) };
-            return target;
         }
     }
 }
