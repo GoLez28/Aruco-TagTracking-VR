@@ -323,7 +323,7 @@ namespace TrackingSmoothing {
                         if (posQueue[c][i][2] == 0) continue;
                         try {
                             if (!Program.debugSendTrackerOSC && shouldShowFrame)
-                                DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rotQueue[c][i], posQueue[c][i], markersLength * 0.5f * sclQueue[c][i]);
+                                Draw.Axis(frame, cameraMatrix[c], distortionMatrix[c], rotQueue[c][i], posQueue[c][i], markersLength * 0.5f * sclQueue[c][i]);
                         } catch {
                             Console.WriteLine("lol");
                         }
@@ -377,7 +377,7 @@ namespace TrackingSmoothing {
                         pos.Y -= 0.1f;
                         Matrix4x4 finalMat = Matrix4x4.Multiply(rot, Matrix4x4.CreateTranslation(pos));
                         if (Program.debugSendTrackerOSC && altCorner == -1 && Program.wantToShowFrame)
-                            DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rvec, tvec, markersLength);
+                            Draw.Axis(frame, cameraMatrix[c], distortionMatrix[c], rvec, tvec, markersLength);
                     }
 
                 }
@@ -502,27 +502,6 @@ namespace TrackingSmoothing {
             rmat.CopyTo(dRotMat);
             CvInvoke.Rodrigues(rvec, rmat);
             return rmat;
-        }
-        static void DrawAxis(Mat frame, Mat cameraMatrix, Mat distortionMatrix, VectorOfDouble rvec, VectorOfDouble tvec, double axisLength) {
-            // Convert rotation vector to rotation matrix
-            Matrix<double> rotationMatrix = new Matrix<double>(4, 4);
-            CvInvoke.Rodrigues(rvec, rotationMatrix);
-
-            // Define the 3D points for drawing the axis lines
-            MCvPoint3D32f[] objectPoints = new MCvPoint3D32f[] {
-                new MCvPoint3D32f(0, 0, 0), // Origin
-                new MCvPoint3D32f((float)axisLength, 0, 0), // X-Axis
-                new MCvPoint3D32f(0, (float)axisLength, 0), // Y-Axis
-                new MCvPoint3D32f(0, 0, (float)axisLength) // Z-Axis
-            };
-
-            // Project the 3D points onto the image plane
-            Mat imagePoints = new Mat();
-            PointF[] points = CvInvoke.ProjectPoints(objectPoints, rotationMatrix, tvec, cameraMatrix, distortionMatrix, imagePoints);
-
-            CvInvoke.Line(frame, Point.Round(points[0]), Point.Round(points[1]), new Bgr(Color.Red).MCvScalar, 2, LineType.AntiAlias);
-            CvInvoke.Line(frame, Point.Round(points[0]), Point.Round(points[2]), new Bgr(Color.Green).MCvScalar, 2, LineType.AntiAlias);
-            CvInvoke.Line(frame, Point.Round(points[0]), Point.Round(points[3]), new Bgr(Color.Blue).MCvScalar, 2, LineType.AntiAlias);
         }
     }
 }
