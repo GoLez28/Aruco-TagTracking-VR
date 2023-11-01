@@ -314,8 +314,8 @@ namespace TrackingSmoothing {
                         if (posQueue[c][i] == null || rotQueue[c][i] == null) continue;
                         if (posQueue[c][i][2] == 0) continue;
                         try {
-                            if (!Program.debugSendTrackerOSC)
-                                ArucoInvoke.DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rotQueue[c][i], posQueue[c][i], markersLength * 0.5f * sclQueue[c][i]);
+                            //if (!Program.debugSendTrackerOSC)
+                            //    ArucoInvoke.DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rotQueue[c][i], posQueue[c][i], markersLength * 0.5f * sclQueue[c][i]);
                         } catch {
                             Console.WriteLine("lol");
                         }
@@ -368,8 +368,8 @@ namespace TrackingSmoothing {
                         //Console.WriteLine($"{c} - {i} = {pos.X}\t{pos.Y}\t{pos.Z}");
                         pos.Y -= 0.1f;
                         Matrix4x4 finalMat = Matrix4x4.Multiply(rot, Matrix4x4.CreateTranslation(pos));
-                        if (Program.debugSendTrackerOSC && altCorner == -1)
-                            ArucoInvoke.DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rvec, tvec, markersLength);
+                        //if (Program.debugSendTrackerOSC && altCorner == -1)
+                        //    ArucoInvoke.DrawAxis(frame, cameraMatrix[c], distortionMatrix[c], rvec, tvec, markersLength);
                     }
 
                 }
