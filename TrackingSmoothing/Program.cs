@@ -51,6 +51,7 @@ namespace TrackingSmoothing {
         public static int updateFPS = 80;
         public static int interpolationTPS = 80;
         public static bool useInterpolation = true;
+        public static bool performanceMode = false;
         public static System.Threading.Thread interpolationThread;
 
         public static bool ovrNotFound = false;
@@ -155,47 +156,7 @@ namespace TrackingSmoothing {
             double delta = timer.Elapsed.TotalMilliseconds - previousTime;
             previousTime = timer.Elapsed.TotalMilliseconds;
             if (frameCount % 10 == 0) {
-                Console.ForegroundColor = ConsoleColor.Black;
-                Console.BackgroundColor = ConsoleColor.Gray;
-                (int x, int y) = Console.GetCursorPosition();
-                int ch = Console.WindowHeight;
-                int ypos = (y + 1) - ch;
-                if (ypos < 0) ypos = 0;
-                Console.SetCursorPosition(0, ypos);
-                for (int i = 0; i < Tag.cameraTPS.Length; i++) {
-                    if (i != 0) Console.Write(" / ");
-                    Console.Write($"Cam {i} TPS: {Tag.cameraTPS[i]:0.00}");
-                }
-                int initX = Console.CursorLeft;
-                int endX = (initX / 8 + 1) * 8;
-                for (int i = initX; i < endX; i++) {
-                    Console.Write(" ");
-                }
-                Console.Write($"App TPS: {(1000.0 / delta):0.00}");
-                initX = Console.CursorLeft;
-                endX = (initX / 8 + 2) * 8;
-                for (int i = initX; i < endX; i++) {
-                    Console.Write(" ");
-                }
-                Console.Write(infoBarWarning);
-                infoBarWarning = "";
-                for (int i = Console.CursorLeft; i < Console.WindowWidth; i++) {
-                    Console.Write(" ");
-                }
-                if (showThreadsMS) {
-                    for (int i = 0; i < threadsWorkTime.Length; i++) {
-                        Console.SetCursorPosition(0, ypos + 1 + i);
-                        if (i == 0) Console.Write("main");
-                        else if (i == 1) Console.Write("interpolate");
-                        else Console.Write($"camera {i - 2}");
-                        Console.Write($": work {threadsWorkTime[i]:0.0000}ms / idle {threadsIdleTime[i]:0.0000}ms");
-                        for (int j = Console.CursorLeft; j < Console.WindowWidth; j++) {
-                            Console.Write(" ");
-                        }
-                    }
-                }
-                Console.SetCursorPosition(x, y);
-                Console.ResetColor();
+                SlowTickLoop(delta);
             }
             //Check for keys
             if (Console.KeyAvailable) {
@@ -224,8 +185,6 @@ namespace TrackingSmoothing {
                         }
                     }
                     //getting controller state stopped working long ago
-                    bool isGripPressed = (state.ulButtonPressed & (1ul << (int)Valve.VR.EVRButtonId.k_EButton_Grip)) != 0;
-                    bool isTriggerPressed = (state.ulButtonPressed & (1ul << (int)Valve.VR.EVRButtonId.k_EButton_SteamVR_Trigger)) != 0;
                     if (isMoveKeyPressed) moveTrigger = true;
                     if (isRotateKeyPressed) rotateTrigger = true;
 
@@ -274,6 +233,7 @@ namespace TrackingSmoothing {
             Tag.Update();
             Tag.GetTrackers();
             Tag.SendTrackers();
+            //Send OVR Headset, Controller and its offsets
             if (debugSendTrackerOSC) {
                 //lefthand
                 var mlh = devPos[1].mDeviceToAbsoluteTracking;
@@ -303,13 +263,7 @@ namespace TrackingSmoothing {
                                            0, 0, 0, 1);
 
                 int waist = -1;
-                int leftfoot = -1;
-                int rightfoot = -1;
                 for (int i = 0; i < Tag.finals.Length; i++) {
-                    if (Tag.finals[i].name.Equals("leftfoot"))
-                        leftfoot = i;
-                    if (Tag.finals[i].name.Equals("rightfoot"))
-                        rightfoot = i;
                     if (Tag.finals[i].name.Equals(poseAdjustWaist))
                         waist = i;
                 }
@@ -317,10 +271,6 @@ namespace TrackingSmoothing {
                 Quaternion q = Tag.finals[waist].frot;
                 Matrix4x4 matw = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(q), Matrix4x4.CreateTranslation(pos));
                 matw = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-0.15f, 0f, 0f)), matw);
-                //matw = Matrix4x4.Multiply(mat, Program.offsetMat);
-                //matw.M41 -= (Program.hmdList[0].X - Program.hmdPos[0]) * Tag.trackers[waist].trackerFollowWeight;
-                //matw.M43 -= (Program.hmdList[0].Y - Program.hmdPos[1]) * Tag.trackers[waist].trackerFollowWeight;
-                //matw.M42 += (Program.hmdList[0].Z - Program.hmdPos[2]) * Tag.trackers[waist].trackerFollowWeight;
                 oscClientDebug.Send("/debug/final/position", 6,
                                            matw.Translation.X, matw.Translation.Z, matw.Translation.Y, //1f, 1.7f, 1f
                                            -q.X, -q.Z, -q.Y, q.W);
@@ -342,6 +292,54 @@ namespace TrackingSmoothing {
             frameCount++;
 
             return previousTime;
+        }
+
+        private static void SlowTickLoop(double delta) {
+            DrawTopBar(delta);
+        }
+
+        private static void DrawTopBar(double delta) {
+            Console.ForegroundColor = ConsoleColor.Black;
+            Console.BackgroundColor = ConsoleColor.Gray;
+            (int x, int y) = Console.GetCursorPosition();
+            int ch = Console.WindowHeight;
+            int ypos = (y + 1) - ch;
+            if (ypos < 0) ypos = 0;
+            Console.SetCursorPosition(0, ypos);
+            for (int i = 0; i < Tag.cameraTPS.Length; i++) {
+                if (i != 0) Console.Write(" / ");
+                Console.Write($"Cam {i} TPS: {Tag.cameraTPS[i]:0.00}");
+            }
+            int initX = Console.CursorLeft;
+            int endX = (initX / 8 + 1) * 8;
+            for (int i = initX; i < endX; i++) {
+                Console.Write(" ");
+            }
+            Console.Write($"App TPS: {(1000.0 / delta):0.00}");
+            initX = Console.CursorLeft;
+            endX = (initX / 8 + 2) * 8;
+            for (int i = initX; i < endX; i++) {
+                Console.Write(" ");
+            }
+            Console.Write(infoBarWarning);
+            infoBarWarning = "";
+            for (int i = Console.CursorLeft; i < Console.WindowWidth; i++) {
+                Console.Write(" ");
+            }
+            if (showThreadsMS) {
+                for (int i = 0; i < threadsWorkTime.Length; i++) {
+                    Console.SetCursorPosition(0, ypos + 1 + i);
+                    if (i == 0) Console.Write("main");
+                    else if (i == 1) Console.Write("interpolate");
+                    else Console.Write($"camera {i - 2}");
+                    Console.Write($": work {threadsWorkTime[i]:0.0000}ms / idle {threadsIdleTime[i]:0.0000}ms");
+                    for (int j = Console.CursorLeft; j < Console.WindowWidth; j++) {
+                        Console.Write(" ");
+                    }
+                }
+            }
+            Console.SetCursorPosition(x, y);
+            Console.ResetColor();
         }
 
         private static void AdjustOffset(Matrix4x4 hmdRotMat) {
@@ -496,6 +494,9 @@ namespace TrackingSmoothing {
             } else if (key == ConsoleKey.J) {
                 LoadOffsets();
                 Console.WriteLine($"Reloaded Offsets");
+            } else if (key == ConsoleKey.H) {
+                performanceMode = !performanceMode;
+                Console.WriteLine($"Performance Mode: " + Show(performanceMode));
             } else if (key == ConsoleKey.Q) {
                 offsetMat.M41 -= 0.01f;
                 Console.WriteLine($"Decreased X offset {offsetMat.M41}");

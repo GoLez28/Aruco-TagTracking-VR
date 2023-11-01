@@ -163,7 +163,12 @@ namespace TrackingSmoothing {
                 arucoThreadIdleBenchmark.Start();
                 while (true) {
                     frame = capture[c].QueryFrame();
-                    if (Tag.cameras[c].skipFrameCount >= Tag.cameras[c].skipFrames) {
+                    int skipFrames = Tag.cameras[c].skipFrames;
+                    if (Program.performanceMode) {
+                        if (skipFrames == 0) skipFrames = 1;
+                        else if (skipFrames > 0) skipFrames *= 2;
+                    }
+                    if (Tag.cameras[c].skipFrameCount >= skipFrames) {
                         Tag.cameras[c].skipFrameCount = 0;
                         break;
                     }
