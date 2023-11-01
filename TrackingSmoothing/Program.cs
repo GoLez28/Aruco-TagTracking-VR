@@ -414,8 +414,8 @@ namespace TrackingSmoothing {
                 for (int i = 0; i < threadsWorkTime.Length; i++) {
                     Console.WriteLine();
                 }
-            Console.WriteLine($"\n[D8] Reset Trackers (VMT)\n[Space] Show Hints\n[D1] Calibrate Cameras\n[D2] Manual Offset Adjust: {Show(adjustOffset)}" +
-                $"\n[D3] Reload Offsets\n[D4] Reloaded Config/Trackers\n[D5] Auto Adjust Offsets\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}\n[D9] Show Camera Windows\n[D0] Clear Console" +
+            Console.WriteLine($"\n[D8] Reset Trackers (VMT)\n[Space] Show Hints\n[D1] Calibrate Camera Positions\n[D2] Manual Offset Adjust: {Show(adjustOffset)}\n[D4] Calibrate Cameras (Distortion): {Show(CameraCalibrate.onCalibration)}" +
+                $"\n[J] Reload Offsets\n[L] Reloaded Config/Trackers\n[D5] Auto Adjust Offsets\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}\n[D9] Show Camera Windows\n[D0] Clear Console" +
                 $"\n[M] Pre-Pose Noise Reduction: {(preNoise == 0 ? "Disabled" : preNoise == 1 ? "Enabled" : "Smooth rects off")}\n[N] Post-Pose Noise Reduction: {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}" +
                 $"\n[Q]-[W] X: {offset.X}\n[A]-[S] Y: {offset.Y}\n[Z]-[X] Z: {offset.Z}\n[E]-[R] Yaw: {rotationY}\n[D]-[F] xRot: {rotationX}\n[C]-[V] zRot: {rotationZ}");
             if (ovrNotFound) {
@@ -463,6 +463,15 @@ namespace TrackingSmoothing {
                     Tag.timedSnapshot = false;
                     Console.WriteLine("Press [1] to start averaging, press [2] to add available trackers, press [3] to add automatically");
                 }
+            } else if (key == ConsoleKey.D4) {
+                if (CameraCalibrate.onCalibration) {
+                    if (CameraCalibrate.framesSaved > 0) {
+                        CameraCalibrate.StartCalibration();
+                    }
+                } else {
+                    Console.WriteLine($"Calibrate Camera");
+                    CameraCalibrate.Init();
+                }
             } else if (key == ConsoleKey.D2) {
                 if (Tag.getRawTrackersStep > -1) {
                     Tag.addNewRaw = true;
@@ -476,13 +485,17 @@ namespace TrackingSmoothing {
                         Console.WriteLine("Move offset with Grip, rotate with Trigger. Or press [P] to move and [O] to rotate instead");
                 }
             } else if (key == ConsoleKey.D3) {
+                //if (CameraCalibrate.startCalibrating) {
+                //    CameraCalibrate.removeBadFrames = !CameraCalibrate.removeBadFrames;
+                //    Console.WriteLine($"Auto-remove frames: " + Show(CameraCalibrate.removeBadFrames));
+                //} else 
                 if (Tag.getRawTrackersStep > -1) {
                     Tag.timedSnapshot = !Tag.timedSnapshot;
                     Console.WriteLine($"Timed snap {(Tag.timedSnapshot ? "activated" : "deactivated")}");
-                } else {
-                    LoadOffsets();
-                    Console.WriteLine($"Reloaded Offsets");
                 }
+            } else if (key == ConsoleKey.J) {
+                LoadOffsets();
+                Console.WriteLine($"Reloaded Offsets");
             } else if (key == ConsoleKey.Q) {
                 offsetMat.M41 -= 0.01f;
                 Console.WriteLine($"Decreased X offset {offsetMat.M41}");
@@ -556,12 +569,16 @@ namespace TrackingSmoothing {
                         oscClientDebug.StopClient();
                     }
                 }
-            } else if (key == ConsoleKey.D4) {
+            } else if (key == ConsoleKey.L) {
                 ReadConfig();
                 Tag.ReadTrackers();
                 Console.WriteLine($"Reloaded Config / Trackers");
                 ApplyOffset();
                 LoadOffsets();
+            } else if (key == ConsoleKey.K) {
+                var info = new System.Diagnostics.ProcessStartInfo(Environment.GetCommandLineArgs()[0]);
+                System.Diagnostics.Process.Start("TagTracking.exe");
+                //Environment.Exit(0);
             } else if (key == ConsoleKey.D5) {
                 autoOffset = !autoOffset;
                 Console.WriteLine($"Auto Adjust Offset");

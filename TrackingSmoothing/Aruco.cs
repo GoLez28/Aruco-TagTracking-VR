@@ -32,7 +32,7 @@ namespace TrackingSmoothing {
             ArucoBoard.Draw(imageSize, boardImage, markersSeparation, borderBits);
 
             // Save the image
-            boardImage.Save("arucoboard.png");
+            boardImage.Save("arucotags.png");
         }
         static RectEx[][] betterRects = new RectEx[][] {
             new RectEx[] { new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new() },
@@ -114,6 +114,7 @@ namespace TrackingSmoothing {
             GridBoard ArucoBoard = null;
             ArucoBoard = new GridBoard(markersX, markersY, markersLength, markersSeparation, ArucoDict);
             PrintArucoBoard(ArucoBoard, markersX, markersY, markersLength, markersSeparation);
+            CameraCalibrate.DrawBoard();
 
             ArucoParameters = new DetectorParameters();
             ArucoParameters = DetectorParameters.GetDefault();
@@ -227,6 +228,13 @@ namespace TrackingSmoothing {
                     //    smoothbenchmark += (sw.ElapsedMilliseconds - smoothbenchmark) * 0.1f;
                     //    Console.WriteLine($"cam {c}: {smoothbenchmark}ms");
                     //}
+                }
+                if (CameraCalibrate.onCalibration && CameraCalibrate.startCalibrating) {
+                    if (c == CameraCalibrate.cameraToUse) {
+                        CameraCalibrate.GetFrame(frame);
+                        frame.Dispose();
+                        continue;
+                    }
                 }
                 //if (c == 0)
                 //    frame = new Mat(@"C:\Users\\Videos\iVCam\.jpg");
