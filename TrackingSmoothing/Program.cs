@@ -52,6 +52,8 @@ namespace TrackingSmoothing {
         public static int interpolationTPS = 80;
         public static bool useInterpolation = true;
         public static bool performanceMode = false;
+        public static float performanceUnderSample = 1.2f;
+        private static bool autoActivatePerformanceMode = false;
         public static System.Threading.Thread interpolationThread;
 
         public static bool ovrNotFound = false;
@@ -77,6 +79,7 @@ namespace TrackingSmoothing {
         public static bool showThreadsMS = false;
         public static double[] threadsWorkTime = new double[4];
         public static double[] threadsIdleTime = new double[4];
+
         static void Main(string[] args) {
             /////////////////////////////////////////////////
             ///TODO:    Fix all this crap of laggy code
@@ -296,6 +299,20 @@ namespace TrackingSmoothing {
 
         private static void SlowTickLoop(double delta) {
             DrawTopBar(delta);
+            //double cpuUsage2 = await GetCpuUsageForProcess();
+            //Console.WriteLine(">" + cpuUsage2);
+        }
+        private static async System.Threading.Tasks.Task<double> GetCpuUsageForProcess() {
+            var startTime = DateTime.UtcNow;
+            var startCpuUsage = Process.GetCurrentProcess().TotalProcessorTime;
+            await System.Threading.Tasks.Task.Delay(500);
+
+            var endTime = DateTime.UtcNow;
+            var endCpuUsage = Process.GetCurrentProcess().TotalProcessorTime;
+            var cpuUsedMs = (endCpuUsage - startCpuUsage).TotalMilliseconds;
+            var totalMsPassed = (endTime - startTime).TotalMilliseconds;
+            var cpuUsageTotal = cpuUsedMs / (Environment.ProcessorCount * totalMsPassed);
+            return cpuUsageTotal * 100;
         }
 
         private static void DrawTopBar(double delta) {
@@ -729,6 +746,8 @@ namespace TrackingSmoothing {
                 else if (split[0].Equals("showThreadsTime")) showThreadsMS = split[1].Equals("true");
                 else if (split[0].Equals("refineIterations")) Tag.refineIterations = int.Parse(split[1]);
                 else if (split[0].Equals("dynamicFiltering")) Tag.dynamicFiltering = split[1].Equals("true");
+                else if (split[0].Equals("performanceUnderSample")) performanceUnderSample = float.Parse(split[1], any, invariantCulture);
+                else if (split[0].Equals("autoActivatePerformanceMode")) Program.autoActivatePerformanceMode = split[1].Equals("true");
                 else if (split[0].Equals("tagsToCalibrate")) {
                     string[] tags = split[1].Split(',');
                     Tag.tagToCalibrate = new int[tags.Length];
@@ -776,6 +795,8 @@ namespace TrackingSmoothing {
                             Tag.cameras[j].depthMult = float.Parse(split[1], any, invariantCulture);
                         } else if (split[0].Equals($"camera{j}Brightness")) {
                             Tag.cameras[j].brightness = float.Parse(split[1], any, invariantCulture);
+                        } else if (split[0].Equals($"camera{j}AdjustCurrentDistortion")) {
+                            Tag.cameras[j].adjustCurrentDistortion = split[1].Equals("true");
                         } else if (split[0].Equals($"camera{j}FrameSkip")) {
                             Tag.cameras[j].skipFrames = int.Parse(split[1]);
                         }

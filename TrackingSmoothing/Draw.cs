@@ -53,6 +53,29 @@ namespace TrackingSmoothing {
             Mat imagePoints = new Mat();
             PointF[] points = CvInvoke.ProjectPoints(objectPoints, rotationMatrix, tvec, cameraMatrix, distortionMatrix, imagePoints);
 
+            //adjust points to canvas
+            bool adjustSize = Program.performanceMode;
+            if (!adjustSize)
+                for (int i = 0; i < Tag.cameras.Length; i++) {
+                    if (Tag.cameras[i].adjustCurrentDistortion) {
+                        adjustSize = true;
+                        break;
+                    }
+                }
+            if (adjustSize) {
+                int cam = 0;
+                for (int i = 0; i < Aruco.cameraMatrix.Length; i++) {
+                    if (Aruco.cameraMatrix[i] == cameraMatrix) {
+                        cam = i;
+                        break;
+                    }
+                }
+                for (int i = 0; i < points.Length; i++) {
+                    points[i].X /= Tag.cameras[cam].xRatio;
+                    points[i].Y /= Tag.cameras[cam].yRatio;
+                }
+            }
+
             // Draw the lines
             for (int i = 0; i < objectLines.Length; i++) {
                 CvInvoke.Line(frame, Point.Round(points[objectLines[i].start]), Point.Round(points[objectLines[i].end]), objectLines[i].color, 2, LineType.AntiAlias);

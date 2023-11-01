@@ -173,11 +173,15 @@ namespace TrackingSmoothing {
             public float brightness = 1f;
             public int skipFrames = 0;
             public int skipFrameCount = 0;
+            public float xRatio = 1f;
+            public float yRatio = 1f;
             public float[] customDist = new float[] {
                     1.075f, 1f, 1.075f,
                     1.025f, 0.975f, 1.025f,
                     1.075f, 1f, 1.075f
                 };
+            internal bool adjustCurrentDistortion = true;
+
             public Camera(Matrix4x4 m, float q, float d) {
                 matrix = m;
                 quality = q;

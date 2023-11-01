@@ -43,8 +43,8 @@ namespace TrackingSmoothing {
         static Dictionary ArucoDict;
         static DetectorParameters ArucoParameters;
         public static int markersLength = 56;
-        static Mat[] cameraMatrix;
-        static Mat[] distortionMatrix;
+        public static Mat[] cameraMatrix;
+        public static Mat[] distortionMatrix;
 
         public static bool useSmoothCorners = true;
         public static int cornersMaxDistance = 1;
@@ -177,9 +177,34 @@ namespace TrackingSmoothing {
                 arucoThreadIdleBenchmark.Stop();
                 arucoThreadWorkBenchmark.Start();
                 bool correctRes = Tag.cameras[c].rsHeight > 10 && Tag.cameras[c].rsWidth > 10;
+                int newRsWidth = Tag.cameras[c].rsWidth;
+                int newRsHeight = Tag.cameras[c].rsHeight;
+                float xRatio = 1f, yRatio = 1f;
                 if (correctRes) {
-                    int newWidth = Tag.cameras[c].rsWidth;
-                    int newHeight = Tag.cameras[c].rsHeight;
+                    if (Tag.cameras[c].adjustCurrentDistortion) {
+                        xRatio = (float)Tag.cameras[c].width / (float)Tag.cameras[c].rsWidth;
+                        yRatio = (float)Tag.cameras[c].height / (float)Tag.cameras[c].rsHeight;
+                    }
+                }
+                if (Program.performanceMode) {
+                    if (correctRes) {
+                        newRsWidth = (int)(newRsWidth / Program.performanceUnderSample);
+                        newRsHeight = (int)(newRsHeight / Program.performanceUnderSample);
+                        xRatio *= Program.performanceUnderSample;
+                        yRatio *= Program.performanceUnderSample;
+                    } else {
+                        correctRes = true;
+                        newRsWidth = (int)(Tag.cameras[c].width / Program.performanceUnderSample);
+                        newRsHeight = (int)(Tag.cameras[c].height / Program.performanceUnderSample);
+                        xRatio *= Program.performanceUnderSample;
+                        yRatio *= Program.performanceUnderSample;
+                    }
+                }
+                Tag.cameras[c].xRatio = xRatio;
+                Tag.cameras[c].yRatio = yRatio;
+                if (correctRes) {
+                    int newWidth = newRsWidth;
+                    int newHeight = newRsHeight;
                     System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
                     bool xb = frameCount % 2 == 0;
                     bool yb = frameCount % 4 > 1;
@@ -304,6 +329,7 @@ namespace TrackingSmoothing {
                         //corners = SkewRects(c, ids, corners, 2, -1);
                         if (shouldShowFrame)
                             ArucoInvoke.DrawDetectedMarkers(frame, corners, ids, new MCvScalar(255, 0, 255));
+                        corners = AdjustDetectedRectsToLowRes(corners, xRatio, yRatio);
 
                         //Estimate pose for each marker using camera calibration matrix and distortion coefficents
                         //get first position to not mess with the others
@@ -347,6 +373,18 @@ namespace TrackingSmoothing {
                 arucoThreadWorkBenchmark.Stop();
                 Program.threadsWorkTime[c + 2] = arucoThreadWorkBenchmark.Elapsed.TotalMilliseconds;
                 Program.threadsIdleTime[c + 2] = arucoThreadIdleBenchmark.Elapsed.TotalMilliseconds;
+            }
+            static VectorOfVectorOfPointF AdjustDetectedRectsToLowRes (VectorOfVectorOfPointF corners, float xRatio, float yRatio) {
+                PointF[][] rects = new PointF[corners.Size][];
+                for (int i = 0; i < corners.Size; i++) {
+                    rects[i] = new PointF[4];
+                    rects[i] = corners[i].ToArray();
+                    for (int j = 0; j < rects[i].Length; j++) {
+                        rects[i][j].X *= xRatio;
+                        rects[i][j].Y *= xRatio;
+                    }
+                }
+                return new(rects);
             }
 
             static void SendDetectedRect(int c, Mat frame, VectorOfInt ids, VectorOfVectorOfPointF corners, int altCorner, Mat tvecs0) {
