@@ -353,8 +353,9 @@ namespace TrackingSmoothing {
                         if (posQueue[c][i] == null || rotQueue[c][i] == null) continue;
                         if (posQueue[c][i][2] == 0) continue;
                         try {
-                            if (!Program.debugSendTrackerOSC && shouldShowFrame)
-                                Draw.Axis(frame, cameraMatrix[c], distortionMatrix[c], rotQueue[c][i], posQueue[c][i], markersLength * 0.5f * sclQueue[c][i]);
+                            if (!Program.debugSendTrackerOSC && shouldShowFrame) {
+                                Draw.Shape(frame, cameraMatrix[c], distortionMatrix[c], rotQueue[c][i], posQueue[c][i], markersLength * 0.5f * sclQueue[c][i], typeQueue[c][i]);
+                            }
                         } catch {
                             Console.WriteLine("lol");
                         }
@@ -503,19 +504,32 @@ namespace TrackingSmoothing {
         static float[][] sclQueue = new float[][] { new float[maxQueue], new float[maxQueue] };
         static VectorOfDouble[][] posQueue = new VectorOfDouble[][] { new VectorOfDouble[maxQueue], new VectorOfDouble[maxQueue] };
         static VectorOfDouble[][] rotQueue = new VectorOfDouble[][] { new VectorOfDouble[maxQueue], new VectorOfDouble[maxQueue] };
+        static Draw.ShapeType[][] typeQueue = new Draw.ShapeType[][] { new Draw.ShapeType[maxQueue], new Draw.ShapeType[maxQueue] };
+        public static void DrawDot(Matrix4x4 rot, float scl = 1) {
+            DrawShape(Draw.ShapeType.Dot, rot, scl);
+        }
+        public static void DrawAxisGray(Matrix4x4 rot, float scl = 1) {
+            DrawShape(Draw.ShapeType.AxisGray, rot, scl);
+        }
         public static void DrawAxis(Matrix4x4 rot, float scl = 1) {
+            DrawShape(Draw.ShapeType.Axis, rot, scl);
+        }
+        public static void DrawCube(Matrix4x4 rot, float scl = 1) {
+            DrawShape(Draw.ShapeType.Cube, rot, scl);
+        }
+        static void DrawShape(Draw.ShapeType shape, Matrix4x4 rot, float scl = 1) {
             for (int i = 0; i < Tag.cameras.Length; i++) {
                 Matrix4x4 camMat = Tag.cameras[i].matrix;
-                DrawAxis(rot, camMat, i, scl);
+                DrawShape(rot, camMat, shape, i, scl);
             }
         }
-        public static void DrawAxis(Matrix4x4 rot, Matrix4x4 camMat, int cam, float scl = 1) {
+        public static void DrawShape(Matrix4x4 rot, Matrix4x4 camMat, Draw.ShapeType type, int cam, float scl = 1) {
             Matrix4x4 invCam;
             Matrix4x4.Invert(camMat, out invCam);
             Matrix4x4 mat = Matrix4x4.Multiply(rot, invCam);
-            DrawAxis(mat, cam, scl);
+            DrawShape(mat, cam, type, scl);
         }
-        public static void DrawAxis(Matrix4x4 rot, int cam, float scl = 1) {
+        public static void DrawShape(Matrix4x4 rot, int cam, Draw.ShapeType type, float scl = 1) {
             if (!Program.wantToShowFrame) return;
             Vector3 pos = rot.Translation;
             double[] asdasd = new double[] {
@@ -534,6 +548,7 @@ namespace TrackingSmoothing {
             if (queueCount[cam] == maxQueue) return;
             posQueue[cam][queueCount[cam]] = tvec2;
             rotQueue[cam][queueCount[cam]] = rvec2;
+            typeQueue[cam][queueCount[cam]] = type;
             if (scl == 0)
                 scl = 0.1f;
             sclQueue[cam][queueCount[cam]] = scl * 3;

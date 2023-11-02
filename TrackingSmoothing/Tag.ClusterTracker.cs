@@ -281,13 +281,18 @@ namespace TrackingSmoothing {
                 for (int i = 0; i < estimatedPos0.Length; i++) {
                     prevMat[i] = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(estimatedRot[i]), Matrix4x4.CreateTranslation(estimatedPos0[i]));
                     //draw current trackers
-                    if (!float.IsNaN(estimatedRot[i].X) && !float.IsNaN(estimatedPos0[i].X) && (Program.frameCount / 8) % 1 == 0)
-                        Aruco.DrawAxis(prevMat[i], Utils.GetMap(trackerPresence[i], 0, 100, 1f, 0.2f));
+                    if (!float.IsNaN(estimatedRot[i].X) && !float.IsNaN(estimatedPos0[i].X) && (Program.frameCount / 8) % 1 == 0) {
+                        if (updateCount[i] > 3)
+                            Aruco.DrawAxisGray(prevMat[i], Utils.GetMap(trackerPresence[i], 0, 100, 1f, 0.2f));
+                        else
+                            Aruco.DrawAxis(prevMat[i], Utils.GetMap(trackerPresence[i], 0, 100, 1f, 0.2f));
+                    }
 
                 }
                 for (int i = 0; i < poss.Length; i++) {
                     if (updateCount[i] > 3) continue;
-                    Aruco.DrawAxis(Matrix4x4.CreateTranslation(poss[i]), 0.1f);
+                    //this show the separate position before sum and final , should be a point
+                    Aruco.DrawDot(Matrix4x4.CreateTranslation(poss[i]), 0.1f);
                 }
 
                 if (Program.debugSendTrackerOSC) {

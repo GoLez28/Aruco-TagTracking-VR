@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 namespace TrackingSmoothing {
     class Draw {
         public enum ShapeType {
-            Dot, Axis, AxisGrey, Cube
+            Dot, Axis, AxisGray, Cube
         }
         public struct Line {
             public MCvScalar color;
@@ -40,10 +40,21 @@ namespace TrackingSmoothing {
             new MCvPoint3D32f(-0.3f, -0.3f, 0.3f),
             new MCvPoint3D32f(-0.3f, 0.3f, 0.3f),
         };
+        static readonly MCvPoint3D32f[] dotVerts = new MCvPoint3D32f[] {
+            new MCvPoint3D32f(0, 0, 0), // Origin
+        };
+        static readonly Line[] dotLines = new Line[] {
+            new Line(new Bgr(Color.DarkOrange).MCvScalar, 0, 0)
+        };
         static readonly Line[] axisLines = new Line[] {
             new Line(new Bgr(Color.Red).MCvScalar, 0, 1),
             new Line(new Bgr(Color.LimeGreen).MCvScalar, 0, 2),
             new Line(new Bgr(Color.Blue).MCvScalar, 0, 3)
+        };
+        static readonly Line[] grayAxisLines = new Line[] {
+            new Line(new Bgr(Color.IndianRed).MCvScalar, 0, 1),
+            new Line(new Bgr(Color.ForestGreen).MCvScalar, 0, 2),
+            new Line(new Bgr(Color.DarkSlateBlue).MCvScalar, 0, 3)
         };
         static readonly Line[] cubeLines = new Line[] {
             new Line(new Bgr(Color.OrangeRed).MCvScalar, 0, 1),
@@ -103,6 +114,10 @@ namespace TrackingSmoothing {
             }
 
             // Draw the lines
+            if (objectLines.Length == 1 && objectLines[0].start == 0 && objectLines[0].end == 0) {
+                CvInvoke.Circle(frame, Point.Round(points[0]), 1, objectLines[0].color, 2, LineType.FourConnected);
+                return;
+            }
             for (int i = 0; i < objectLines.Length; i++) {
                 CvInvoke.Line(frame, Point.Round(points[objectLines[i].start]), Point.Round(points[objectLines[i].end]), objectLines[i].color, 2, LineType.AntiAlias);
             }
@@ -113,6 +128,10 @@ namespace TrackingSmoothing {
                     return (MCvPoint3D32f[])axisVerts.Clone();
                 case ShapeType.Cube:
                     return (MCvPoint3D32f[])cubeVerts.Clone();
+                case ShapeType.AxisGray:
+                    return (MCvPoint3D32f[])axisVerts.Clone();
+                case ShapeType.Dot:
+                    return (MCvPoint3D32f[])dotVerts.Clone();
                 default:
                     return (MCvPoint3D32f[])axisVerts.Clone();
             }
@@ -123,6 +142,10 @@ namespace TrackingSmoothing {
                     return axisLines;
                 case ShapeType.Cube:
                     return cubeLines;
+                case ShapeType.AxisGray:
+                    return grayAxisLines;
+                case ShapeType.Dot:
+                    return dotLines;
                 default:
                     return axisLines;
             }

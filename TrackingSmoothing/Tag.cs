@@ -857,7 +857,7 @@ namespace TrackingSmoothing {
                 mat.M41 += (headPos.X - Program.hmdPos[0]) * trackers[i].trackerFollowWeight;
                 mat.M43 += (headPos.Y - Program.hmdPos[1]) * trackers[i].trackerFollowWeight;
                 mat.M42 -= (headPos.Z - Program.hmdPos[2]) * trackers[i].trackerFollowWeight;
-                Aruco.DrawAxis(mat);
+                Aruco.DrawCube(mat);
                 //Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
                 //                            pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
                 //                            -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
