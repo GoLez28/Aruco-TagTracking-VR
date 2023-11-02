@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.Numerics;
 using System.IO;
 
-namespace TrackingSmoothing {
+namespace TagTracking {
     static partial class Tag {
         public class FinalTracker {
             public Vector3 pos;

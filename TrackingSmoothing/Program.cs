@@ -12,7 +12,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.IO;
 
-namespace TrackingSmoothing {
+namespace TagTracking {
     class Program {
         public static bool sendRaw = false;
         public static bool legsFolded = false;

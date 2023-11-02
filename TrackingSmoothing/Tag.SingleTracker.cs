@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Numerics;
 
-namespace TrackingSmoothing {
+namespace TagTracking {
     static partial class Tag {
         // i like everything public
         public class SingleTracker {

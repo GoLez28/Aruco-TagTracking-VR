@@ -12,7 +12,7 @@ using Emgu.CV.Util; // the side kick
 using System.Numerics;
 using System.Runtime.InteropServices;
 
-namespace TrackingSmoothing {
+namespace TagTracking {
     class Aruco {
         class RectEx {
             public PointF[] smoothedVals = new PointF[4];

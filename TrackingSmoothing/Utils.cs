@@ -5,7 +5,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TrackingSmoothing {
+namespace TagTracking {
     static class Utils {
         public static float GetDistance(float[] a, float[] b) {
             return GetDistance(a[0], a[1], a[2], b[0], b[1], b[2]);

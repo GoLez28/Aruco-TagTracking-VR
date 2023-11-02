@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Numerics;
 
-namespace TrackingSmoothing {
+namespace TagTracking {
 	class LowPassFilter {
 		float y, a, s;
 		bool initialized;

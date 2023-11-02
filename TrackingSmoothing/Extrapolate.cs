@@ -5,7 +5,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TrackingSmoothing {
+namespace TagTracking {
     static class Extrapolate {
         public class Tracker {
             List<Vector3> posList = new();

@@ -9,7 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TrackingSmoothing {
+namespace TagTracking {
     class Draw {
         public enum ShapeType {
             Dot, Axis, AxisGray, Cube

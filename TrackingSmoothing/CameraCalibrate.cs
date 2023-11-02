@@ -12,7 +12,7 @@ using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
 using Emgu.CV.Util;
 
-namespace TrackingSmoothing {
+namespace TagTracking {
     static class CameraCalibrate {
         public static bool onCalibration;
         public static bool startCalibrating = false;
