@@ -31,14 +31,14 @@ namespace TrackingSmoothing {
             new MCvPoint3D32f(0, 0, 1f) // Z-Axis
         };
         static readonly MCvPoint3D32f[] cubeVerts = new MCvPoint3D32f[] {
-            new MCvPoint3D32f(0.5f, 0.5f, -0.5f),
-            new MCvPoint3D32f(0.5f, -0.5f, -0.5f),
-            new MCvPoint3D32f(-0.5f, -0.5f, -0.5f),
-            new MCvPoint3D32f(-0.5f, 0.5f, -0.5f),
-            new MCvPoint3D32f(0.5f, 0.5f, 0.5f),
-            new MCvPoint3D32f(0.5f, -0.5f, 0.5f),
-            new MCvPoint3D32f(-0.5f, -0.5f, 0.5f),
-            new MCvPoint3D32f(-0.5f, 0.5f, 0.5f),
+            new MCvPoint3D32f(0.3f, 0.3f, -0.3f),
+            new MCvPoint3D32f(0.3f, -0.3f, -0.3f),
+            new MCvPoint3D32f(-0.3f, -0.3f, -0.3f),
+            new MCvPoint3D32f(-0.3f, 0.3f, -0.3f),
+            new MCvPoint3D32f(0.3f, 0.3f, 0.3f),
+            new MCvPoint3D32f(0.3f, -0.3f, 0.3f),
+            new MCvPoint3D32f(-0.3f, -0.3f, 0.3f),
+            new MCvPoint3D32f(-0.3f, 0.3f, 0.3f),
         };
         static readonly Line[] axisLines = new Line[] {
             new Line(new Bgr(Color.Red).MCvScalar, 0, 1),
@@ -46,20 +46,20 @@ namespace TrackingSmoothing {
             new Line(new Bgr(Color.Blue).MCvScalar, 0, 3)
         };
         static readonly Line[] cubeLines = new Line[] {
-            new Line(new Bgr(Color.Purple).MCvScalar, 0, 1),
-            new Line(new Bgr(Color.Purple).MCvScalar, 1, 2),
-            new Line(new Bgr(Color.Purple).MCvScalar, 2, 3),
-            new Line(new Bgr(Color.Purple).MCvScalar, 3, 0),
+            new Line(new Bgr(Color.OrangeRed).MCvScalar, 0, 1),
+            new Line(new Bgr(Color.Orange).MCvScalar, 1, 2),
+            new Line(new Bgr(Color.Orange).MCvScalar, 2, 3),
+            new Line(new Bgr(Color.Orange).MCvScalar, 3, 0),
 
-            new Line(new Bgr(Color.Purple).MCvScalar, 4, 0),
-            new Line(new Bgr(Color.Purple).MCvScalar, 5, 1),
-            new Line(new Bgr(Color.Purple).MCvScalar, 6, 2),
-            new Line(new Bgr(Color.Purple).MCvScalar, 7, 3),
+            new Line(new Bgr(Color.OrangeRed).MCvScalar, 4, 0),
+            new Line(new Bgr(Color.Orange).MCvScalar, 5, 1),
+            new Line(new Bgr(Color.Orange).MCvScalar, 6, 2),
+            new Line(new Bgr(Color.Orange).MCvScalar, 7, 3),
 
-            new Line(new Bgr(Color.Pink).MCvScalar, 4, 5),
-            new Line(new Bgr(Color.Pink).MCvScalar, 5, 6),
-            new Line(new Bgr(Color.Pink).MCvScalar, 6, 7),
-            new Line(new Bgr(Color.Pink).MCvScalar, 7, 4),
+            new Line(new Bgr(Color.OrangeRed).MCvScalar, 4, 5),
+            new Line(new Bgr(Color.Orange).MCvScalar, 5, 6),
+            new Line(new Bgr(Color.Orange).MCvScalar, 6, 7),
+            new Line(new Bgr(Color.Orange).MCvScalar, 7, 4),
         };
 
         public static void Axis(Mat frame, Mat cameraMatrix, Mat distortionMatrix, VectorOfDouble rvec, VectorOfDouble tvec, double axisLength) {
