@@ -213,7 +213,12 @@ namespace TrackingSmoothing {
                     new Vector3 (0f, 0f, -0.055f),
                     new Vector3 (0f, 0f, -0.055f)
                 },
-                new float[] {0f, (float)Math.PI / 2, (float)Math.PI, (float)Math.PI * 1.5f}
+                new Vector3[] {
+                    new(0f,                     0f, 0f),
+                    new((float)Math.PI / 2,     0f, 0f),
+                    new((float)Math.PI,         0f, 0f),
+                    new((float)Math.PI * 1.5f,  0f, 0f)
+                }
                 ),
             new ClusterTracker("leftfoot",
                 new int[] { 4, 5, 6, 7 },
@@ -223,7 +228,12 @@ namespace TrackingSmoothing {
                     new Vector3 (0f, 0f, -0.055f),
                     new Vector3 (0f, 0f, -0.055f)
                 },
-                new float[] {0f, (float)Math.PI / 2, (float)Math.PI, (float)Math.PI * 1.5f}
+                new Vector3[] {
+                    new(0f,                     0f, 0f),
+                    new((float)Math.PI / 2,     0f, 0f),
+                    new((float)Math.PI,         0f, 0f),
+                    new((float)Math.PI * 1.5f,  0f, 0f) 
+                }
                 ),
             new ClusterTracker("waist",
                 new int[] { 8, 9, 10, 11 },
@@ -233,7 +243,12 @@ namespace TrackingSmoothing {
                     new Vector3 (-0.0f, -0.00f, -0.12f),
                     new Vector3 (-0.0f, -0.00f, -0.17f)
                 },
-                new float[] {0f, (float)Math.PI * 0.3f, (float)Math.PI * 0.7f, (float)Math.PI * 1f}
+                new Vector3[] {
+                    new(0f,                     0f, 0f),
+                    new((float)Math.PI / 2,     0f, 0f),
+                    new((float)Math.PI,         0f, 0f),
+                    new((float)Math.PI * 1.5f,  0f, 0f) 
+                }
                 )
         };
         public static List<CombinedTracker> combinedTrackers = new();
@@ -320,7 +335,7 @@ namespace TrackingSmoothing {
             List<ClusterTracker> trackerss = new List<ClusterTracker>();
             ClusterTracker currentTracker = null;
             List<int> indexes = new List<int>();
-            List<float> rots = new List<float>();
+            List<Vector3> rots = new List<Vector3>();
             List<Vector3> offsets = new List<Vector3>();
             string name = "";
             int i = 0;
@@ -363,15 +378,26 @@ namespace TrackingSmoothing {
                     offsets.Clear();
                     continue;
                 }
-                if (split.Length != 5) {
+                if (split.Length != 5 && split.Length != 7) {
                     Console.WriteLine($"Incorrect tracker: line {(i - 1)}");
+                    continue;
+                }
+                if (split.Length == 5) {
+                    Console.WriteLine($"Please use 7 parameters for tracker: line {(i - 1)}");
                 }
                 indexes.Add(int.Parse(split[0]));
-                rots.Add(float.Parse(split[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture));
+                Vector3 rot = new Vector3();
+                rot.X = float.Parse(split[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture);
+                if (split.Length == 7) {
+                    rot.Y = float.Parse(split[2], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture);
+                    rot.Z = float.Parse(split[3], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture);
+                }
+                int newI = split.Length == 7 ? 2 : 0;
+                rots.Add(rot);
                 Vector3 offset = new Vector3();
-                offset.X = float.Parse(split[2], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture);
-                offset.Y = float.Parse(split[3], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture);
-                offset.Z = float.Parse(split[4], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture);
+                offset.X = float.Parse(split[2 + newI], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture);
+                offset.Y = float.Parse(split[3 + newI], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture);
+                offset.Z = float.Parse(split[4 + newI], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture);
                 offsets.Add(offset);
             }
             if (currentTracker != null) {

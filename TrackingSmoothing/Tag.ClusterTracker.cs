@@ -14,7 +14,11 @@ namespace TrackingSmoothing {
                 new Vector3 (0f, 0f, -0.05f),
                 new Vector3 (0f, 0f, -0.05f)
             };
-            public float[] trackerRotations = new float[] { 0f, (float)Math.PI / 2, (float)Math.PI, (float)Math.PI * 1.5f };
+            public Vector3[] trackerRotations = new Vector3[] { 
+                new(0f,                     0f, 0f), 
+                new((float)Math.PI / 2,     0f, 0f), 
+                new((float)Math.PI,         0f, 0f), 
+                new((float)Math.PI * 1.5f,  0f, 0f) };
             public float[] trackerPresence = new float[4];
             public int[] updateCount = new int[4];
             public int[] updateCountp = new int[4];
@@ -43,7 +47,7 @@ namespace TrackingSmoothing {
 
             public float trackerFollowWeight = 0.0f;
 
-            public ClusterTracker(string name, int[] ids, Vector3[] ofss, float[] rots) {
+            public ClusterTracker(string name, int[] ids, Vector3[] ofss, Vector3[] rots) {
                 trackerName = name;
                 trackerIndex = ids;
                 trackerOffsets = ofss;
@@ -425,7 +429,9 @@ namespace TrackingSmoothing {
                     for (int j = 0; j < cams; j++) {
                         trackersMat[i + j] = get[j];
                         trackerStraightness[i + j] = trackers[ix2].trackerStraightness[j];
-                        trackerRotationsMat[i + j] = Matrix4x4.CreateFromAxisAngle(new Vector3(0, -1, 0), trackerRotations[ix2]);
+                        trackerRotationsMat[i + j] = Matrix4x4.CreateFromAxisAngle(new Vector3(0, -1, 0), trackerRotations[ix2].X);
+                        trackerRotationsMat[i + j] = Matrix4x4.Multiply(trackerRotationsMat[i + j], Matrix4x4.CreateFromAxisAngle(new Vector3(1, 0, 0), trackerRotations[ix2].Y));
+                        trackerRotationsMat[i + j] = Matrix4x4.Multiply(trackerRotationsMat[i + j], Matrix4x4.CreateFromAxisAngle(new Vector3(0, 0, 1), trackerRotations[ix2].Z));
                         trackerOffsetsMat[i + j] = Matrix4x4.CreateTranslation(trackerOffsets[ix2]);
                     }
                 }
