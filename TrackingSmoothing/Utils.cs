@@ -60,5 +60,28 @@ namespace TagTracking {
             r = Quaternion.Normalize(r);
             return r;
         }
+        public static void ToYawPitchRoll(Quaternion quaternion, out float yaw, out float pitch, out float roll) {
+            // Convert the quaternion to Euler angles (yaw, pitch, roll)
+            float sqw = quaternion.W * quaternion.W;
+            float sqx = quaternion.X * quaternion.X;
+            float sqy = quaternion.Y * quaternion.Y;
+            float sqz = quaternion.Z * quaternion.Z;
+
+            // Yaw (heading) rotation
+            float t0 = 2.0f * (quaternion.W * quaternion.Z + quaternion.X * quaternion.Y);
+            float t1 = 1.0f - 2.0f * (sqy + sqz);
+            yaw = (float)Math.Atan2(t0, t1);
+
+            // Pitch (attitude) rotation
+            float t2 = 2.0f * (quaternion.W * quaternion.X - quaternion.Y * quaternion.Z);
+            t2 = t2 > 1.0f ? 1.0f : t2;
+            t2 = t2 < -1.0f ? -1.0f : t2;
+            pitch = (float)Math.Asin(t2);
+
+            // Roll (bank) rotation
+            float t3 = 2.0f * (quaternion.W * quaternion.Y + quaternion.Z * quaternion.X);
+            float t4 = 1.0f - 2.0f * (sqx + sqy);
+            roll = (float)Math.Atan2(t3, t4);
+        }
     }
 }

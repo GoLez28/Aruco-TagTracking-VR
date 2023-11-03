@@ -14,10 +14,10 @@ namespace TagTracking {
                 new Vector3 (0f, 0f, -0.05f),
                 new Vector3 (0f, 0f, -0.05f)
             };
-            public Vector3[] trackerRotations = new Vector3[] { 
-                new(0f,                     0f, 0f), 
-                new((float)Math.PI / 2,     0f, 0f), 
-                new((float)Math.PI,         0f, 0f), 
+            public Vector3[] trackerRotations = new Vector3[] {
+                new(0f,                     0f, 0f),
+                new((float)Math.PI / 2,     0f, 0f),
+                new((float)Math.PI,         0f, 0f),
                 new((float)Math.PI * 1.5f,  0f, 0f) };
             public float[] trackerPresence = new float[4];
             public int[] updateCount = new int[4];
@@ -40,6 +40,7 @@ namespace TagTracking {
             public float maxSpikeRotDiff = 0.9f;
             public float smoothedRot = 5;
             public float smoothedPos = 2;
+            public bool generatedByCalibration = false;
             int ghost = 0; //cheap way to avoid all uppdateCount at 0 and crash
 
             public float rotationComparison = 0.95f;
@@ -429,9 +430,27 @@ namespace TagTracking {
                     for (int j = 0; j < cams; j++) {
                         trackersMat[i + j] = get[j];
                         trackerStraightness[i + j] = trackers[ix2].trackerStraightness[j];
-                        trackerRotationsMat[i + j] = Matrix4x4.CreateFromAxisAngle(new Vector3(0, -1, 0), trackerRotations[ix2].X);
-                        trackerRotationsMat[i + j] = Matrix4x4.Multiply(trackerRotationsMat[i + j], Matrix4x4.CreateFromAxisAngle(new Vector3(1, 0, 0), trackerRotations[ix2].Y));
-                        trackerRotationsMat[i + j] = Matrix4x4.Multiply(trackerRotationsMat[i + j], Matrix4x4.CreateFromAxisAngle(new Vector3(0, 0, 1), trackerRotations[ix2].Z));
+                        if (generatedByCalibration) {
+                            float cy = MathF.Cos(trackerRotations[ix2].Z * 0.5f);
+                            float sy = MathF.Sin(trackerRotations[ix2].Z * 0.5f);
+                            float cr = MathF.Cos(trackerRotations[ix2].Y * 0.5f);
+                            float sr = MathF.Sin(trackerRotations[ix2].Y * 0.5f);
+                            float cp = MathF.Cos(trackerRotations[ix2].X * 0.5f);
+                            float sp = MathF.Sin(trackerRotations[ix2].X * 0.5f);
+                            float w = cy * cr * cp + sy * sr * sp;
+                            float x = cy * sr * cp - sy * cr * sp;
+                            float y = cy * cr * sp + sy * sr * cp;
+                            float z = sy * cr * cp - cy * sr * sp;
+                            Quaternion quaternion = new Quaternion(x, y, z, w);
+                            Matrix4x4 rotMat = Matrix4x4.CreateFromQuaternion(quaternion);
+                            trackerRotationsMat[i + j] = rotMat;
+                        } else {
+                            trackerRotationsMat[i + j] = Matrix4x4.CreateFromAxisAngle(new Vector3(0, -1, 0), trackerRotations[ix2].X);
+                            trackerRotationsMat[i + j] = Matrix4x4.Multiply(trackerRotationsMat[i + j], Matrix4x4.CreateFromAxisAngle(new Vector3(1, 0, 0), trackerRotations[ix2].Y));
+                            trackerRotationsMat[i + j] = Matrix4x4.Multiply(trackerRotationsMat[i + j], Matrix4x4.CreateFromAxisAngle(new Vector3(0, 0, 1), trackerRotations[ix2].Z));
+                        }
+
+
                         trackerOffsetsMat[i + j] = Matrix4x4.CreateTranslation(trackerOffsets[ix2]);
                     }
                 }
@@ -713,7 +732,7 @@ namespace TagTracking {
                     if (float.IsNaN(rots[i].X))
                         rots[i] = Quaternion.Identity;
                     if (final) {
-                        if (Program.debugSendTrackerOSC && (updateCountCpy[i] < 2 || (i % cameras.Length == 0))) {
+                        if (Program.debugSendTrackerOSC && updateCountCpy[i] < 2) {
                             Matrix4x4 dir = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-0.25f, 0, 0)), Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(rots[i]), Matrix4x4.CreateTranslation(poss[i])));
                             Vector3 dirV = dir.Translation;
                             int id = trackerIndex[i / cameras.Length];

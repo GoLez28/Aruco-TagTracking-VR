@@ -417,7 +417,7 @@ namespace TagTracking {
             offsetMat.M43 = offsetMat.M43 + roomOffset.Z;
 
             Quaternion asdd = Quaternion.CreateFromRotationMatrix(offsetMat);
-            ToYawPitchRoll(asdd, out float newY, out float newX, out float newZ);
+            Utils.ToYawPitchRoll(asdd, out float newY, out float newX, out float newZ);
             rotationY = newY;
             rotationX = newX;
             rotationZ = newZ;
@@ -480,8 +480,11 @@ namespace TagTracking {
                 }
             } else if (key == ConsoleKey.D4) {
                 if (CameraCalibrate.onCalibration) {
-                    if (CameraCalibrate.framesSaved > 0) {
-                        CameraCalibrate.StartCalibration();
+                    if (CameraCalibrate.startCalibrating) {
+                        if (CameraCalibrate.framesSaved == 0)
+                            CameraCalibrate.Cancel();
+                        else
+                            CameraCalibrate.StartCalibration();
                     }
                 } else {
                     Console.WriteLine($"Calibrate Camera");
@@ -507,6 +510,13 @@ namespace TagTracking {
                 if (Tag.getRawTrackersStep > -1) {
                     Tag.timedSnapshot = !Tag.timedSnapshot;
                     Console.WriteLine($"Timed snap {(Tag.timedSnapshot ? "activated" : "deactivated")}");
+                } else {
+                    if (TrackerCalibrate.startCalibrating) {
+                        TrackerCalibrate.End();
+                    } else {
+                        Console.WriteLine($"Calibrate Tracker");
+                        TrackerCalibrate.Init();
+                    }
                 }
             } else if (key == ConsoleKey.J) {
                 LoadOffsets();
@@ -669,29 +679,6 @@ namespace TagTracking {
             newMat.M42 = offsetMat.M42;
             newMat.M43 = offsetMat.M43;
             offsetMat = newMat;
-        }
-        static void ToYawPitchRoll(Quaternion quaternion, out float yaw, out float pitch, out float roll) {
-            // Convert the quaternion to Euler angles (yaw, pitch, roll)
-            float sqw = quaternion.W * quaternion.W;
-            float sqx = quaternion.X * quaternion.X;
-            float sqy = quaternion.Y * quaternion.Y;
-            float sqz = quaternion.Z * quaternion.Z;
-
-            // Yaw (heading) rotation
-            float t0 = 2.0f * (quaternion.W * quaternion.Z + quaternion.X * quaternion.Y);
-            float t1 = 1.0f - 2.0f * (sqy + sqz);
-            yaw = (float)Math.Atan2(t0, t1);
-
-            // Pitch (attitude) rotation
-            float t2 = 2.0f * (quaternion.W * quaternion.X - quaternion.Y * quaternion.Z);
-            t2 = t2 > 1.0f ? 1.0f : t2;
-            t2 = t2 < -1.0f ? -1.0f : t2;
-            pitch = (float)Math.Asin(t2);
-
-            // Roll (bank) rotation
-            float t3 = 2.0f * (quaternion.W * quaternion.Y + quaternion.Z * quaternion.X);
-            float t4 = 1.0f - 2.0f * (sqx + sqy);
-            roll = (float)Math.Atan2(t3, t4);
         }
 
         static void LoadOffsets() {

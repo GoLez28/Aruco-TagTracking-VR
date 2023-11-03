@@ -171,5 +171,10 @@ namespace TagTracking {
             chboard.Draw(imageSize, boardImage);
             boardImage.Save("charuco.png");
         }
+        public static void Cancel() {
+            Console.WriteLine("Calibration cancelled");
+            onCalibration = false;
+            startCalibrating = false;
+        }
     }
 }

@@ -352,7 +352,8 @@ namespace TagTracking {
                             string[] split2 = split[0].Split("=");
                             if (split2.Length != 2) continue;
 
-                            float val = float.Parse(split2[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture);
+                            float val = 0;
+                            float.TryParse(split2[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out val);
                             if (split2[0].Equals("avgSmoothDistTrigger")) currentTracker.avgSmoothDistTrigger = val;
                             else if (split2[0].Equals("avgSmoothVal")) currentTracker.avgSmoothVal = val;
                             else if (split2[0].Equals("avgSmoothRecoverVal")) currentTracker.avgSmoothRecoverVal = val;
@@ -366,6 +367,7 @@ namespace TagTracking {
                             else if (split2[0].Equals("filterSmoothPerTrackerRot")) currentTracker.UpdatePerTrackerFilterRot(val);
                             else if (split2[0].Equals("filterSmoothPerTrackerDepth")) currentTracker.UpdatePerTrackerFilterDepth(val);
                             else if (split2[0].Equals("trackerFollowWeight")) currentTracker.trackerFollowWeight = val;
+                            else if (split2[0].Equals("generatedByCalibration")) currentTracker.generatedByCalibration = split2[1].Equals("true");
 
                         } else {
                             trackerss.Add(currentTracker);
@@ -454,6 +456,9 @@ namespace TagTracking {
                 if (tag != null) {
                     RecieveTracker(tag.index, tag.camera, tag.rot, tag.pos, tag.altRot);
                 }
+            }
+            if (TrackerCalibrate.startCalibrating) {
+                TrackerCalibrate.GetTrackerEnd();
             }
             if (Program.debugSendTrackerOSC) {
                 if (Program.timer.ElapsedMilliseconds - saveMatTime < 15000) {
@@ -583,6 +588,12 @@ namespace TagTracking {
             //    //Console.WriteLine($"post\t{pos.X}\t{pos.Y}\t{pos.Z}");
             //    //Console.WriteLine();
             //}
+            if (TrackerCalibrate.startCalibrating) {
+                if (altRot == -1 && camera == TrackerCalibrate.cameraToUse) {
+                    TrackerCalibrate.GetTracker(index, pos, rot);
+                }
+                return;
+            }
 
             if (camera != lastCamera || (camera == lastCamera && lastIndex >= index)) {
                 double tps = 1000.0 / (Program.timer.Elapsed.TotalMilliseconds - lastFrameTime[camera]);
