@@ -735,7 +735,18 @@ namespace TagTracking {
                 else if (split[0].Equals("dynamicFiltering")) Tag.dynamicFiltering = split[1].Equals("true");
                 else if (split[0].Equals("performanceUnderSample")) performanceUnderSample = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("autoActivatePerformanceMode")) Program.autoActivatePerformanceMode = split[1].Equals("true");
-                else if (split[0].Equals("tagsToCalibrate")) {
+                else if (split[0].Equals("perTrackerSize")) {
+                    Aruco.perMarkerLength.Clear();
+                    string[] split2 = split[1].Split(",");
+                    for (int j = 0; j < split2.Length; j++) {
+                        string[] split3 = split2[j].Split(" ");
+                        if (split3.Length != 2) continue;
+                        int.TryParse(split3[0], out int id);
+                        int.TryParse(split3[1], out int length);
+                        if (length == 0) continue;
+                        Aruco.perMarkerLength.Add((id, length));
+                    }
+                } else if (split[0].Equals("tagsToCalibrate")) {
                     string[] tags = split[1].Split(',');
                     Tag.tagToCalibrate = new int[tags.Length];
                     for (int j = 0; j < tags.Length; j++) {

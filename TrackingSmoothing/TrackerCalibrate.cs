@@ -235,24 +235,29 @@ namespace TagTracking {
             startCalibrating = false;
             Console.WriteLine("Ended Reading, calibrate and save it? (Y), or do it again with same tags? (N)");
             string ans = Console.ReadLine();
-            if (ans.ToLower().Equals("y") || ans.ToLower().Equals("yes") || ans.ToLower().Equals("yeah") || ans.ToLower().Equals("si") || ans.ToLower().Equals("s")) { //lol
+            if (ans.Equals("") || ans.ToLower().Equals("y") || ans.ToLower().Equals("yes") || ans.ToLower().Equals("yeah") || ans.ToLower().Equals("si") || ans.ToLower().Equals("s")) { //lol
                 Thread calibThread = new Thread(() => NewMethod());
                 calibThread.Start();
             } else {
                 try {
                     bool doItAll = false;
-                    string[] split = ans.Split(" ");
-                    if (split.Length == 0 || split[0] == "") {
+                    int[] segId = new int[ids.Length];
+                    if (ans.ToLower().Equals("no") || ans.ToLower().Equals("n") || ans.ToLower().Equals("nah"))
                         doItAll = true;
-                    }
-                    int[] segId = new int[split.Length];
-                    for (int i = 0; i < split.Length; i++) {
-                        segId[i] = int.Parse(split[i]);
+                    if (!doItAll) {
+                        string[] split = ans.Split(" ");
+                        if (split.Length == 0 || split[0] == "") {
+                            doItAll = true;
+                        }
+                        segId = new int[split.Length];
+                        for (int i = 0; i < split.Length; i++) {
+                            segId[i] = int.Parse(split[i]);
+                        }
                     }
                     Program.oscClientDebug.Send("/debug/calibrate/clear", 0);
                     onCalibration = true;
                     startCalibrating = true;
-                    if (doItAll) segId = ids;
+                    if (doItAll) ids.CopyTo(segId, 0);
                     for (int i = 0; i < segId.Length; i++) {
                         for (int j = 0; j < ids.Length; j++) {
                             if (segId[i] == ids[j]) { segId[i] = j; break; }
@@ -324,23 +329,22 @@ namespace TagTracking {
                     rotY[index] = rollRad;
                     rotZ[index] = yawRad;
 
+                    if (!Program.debugSendTrackerOSC) continue;
+
                     float cy = MathF.Cos(yawRad * 0.5f);
                     float sy = MathF.Sin(yawRad * 0.5f);
                     float cr = MathF.Cos(rollRad * 0.5f);
                     float sr = MathF.Sin(rollRad * 0.5f);
                     float cp = MathF.Cos(pitchRad * 0.5f);
                     float sp = MathF.Sin(pitchRad * 0.5f);
-
                     // Calcular los componentes del quaternion
                     float w = cy * cr * cp + sy * sr * sp;
                     float x = cy * sr * cp - sy * cr * sp;
                     float y = cy * cr * sp + sy * sr * cp;
                     float z = sy * cr * cp - cy * sr * sp;
-
                     // Crear el quaternion
                     Quaternion quaternion = new Quaternion(x, y, z, w);
                     Matrix4x4 testRot = Matrix4x4.CreateFromQuaternion(quaternion);
-
                     testRot = Matrix4x4.Multiply(testRot, orgRot);
                     Matrix4x4 testPoint = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(frameCount % 4 == 4 ? 0.01f : 0, frameCount % 4 == 4 ? 0.01f : 0, 0.05f)), testRot);
                     testPoint.M41 += finalCenterPos.X;

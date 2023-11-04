@@ -43,6 +43,7 @@ namespace TagTracking {
         static Dictionary ArucoDict;
         static DetectorParameters ArucoParameters;
         public static int markersLength = 56;
+        public static List<(int, int)> perMarkerLength = new List<(int, int)>();
         public static Mat[] cameraMatrix;
         public static Mat[] distortionMatrix;
 
@@ -415,6 +416,13 @@ namespace TagTracking {
                             (float)dRotMat[1], (float)dRotMat[4], (float)dRotMat[7], 0f,
                             (float)dRotMat[2], (float)dRotMat[5], (float)dRotMat[8], 0f,
                             0f, 0f, 0f, 1f);
+
+                        for (int j = 0; j < perMarkerLength.Count; j++) {
+                            (int id, int length) = perMarkerLength[j];
+                            if (id != ids[i]) continue;
+                            float m = (float)markersLength / length;
+                            pos /= m;
+                        }
                         //if (!Tag.newInfoReady)
                         Tag.RecieveTrackerAsync(ids[i], c, rot, pos, altCorner);
                         //Console.WriteLine($"{c} - {i} = {pos.X}\t{pos.Y}\t{pos.Z}");
