@@ -19,6 +19,7 @@ namespace TagTracking {
                 new((float)Math.PI / 2,     0f, 0f),
                 new((float)Math.PI,         0f, 0f),
                 new((float)Math.PI * 1.5f,  0f, 0f) };
+            public float reduceOffset = 0f;
             public float[] trackerPresence = new float[4];
             public int[] updateCount = new int[4];
             public int[] updateCountp = new int[4];
@@ -47,6 +48,8 @@ namespace TagTracking {
             public float straightTrackerWeight = 1.5f;
 
             public float trackerFollowWeight = 0.0f;
+            public float rightElbowtrackerFollowWeight = 0.0f;
+            public float leftElbowtrackerFollowWeight = 0.0f;
 
             public ClusterTracker(string name, int[] ids, Vector3[] ofss, Vector3[] rots) {
                 trackerName = name;
@@ -451,7 +454,7 @@ namespace TagTracking {
                         }
 
 
-                        trackerOffsetsMat[i + j] = Matrix4x4.CreateTranslation(trackerOffsets[ix2]);
+                        trackerOffsetsMat[i + j] = Matrix4x4.CreateTranslation(trackerOffsets[ix2] * (1f-reduceOffset));
                     }
                 }
             }

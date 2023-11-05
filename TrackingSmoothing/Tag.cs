@@ -232,7 +232,7 @@ namespace TagTracking {
                     new(0f,                     0f, 0f),
                     new((float)Math.PI / 2,     0f, 0f),
                     new((float)Math.PI,         0f, 0f),
-                    new((float)Math.PI * 1.5f,  0f, 0f) 
+                    new((float)Math.PI * 1.5f,  0f, 0f)
                 }
                 ),
             new ClusterTracker("waist",
@@ -247,7 +247,7 @@ namespace TagTracking {
                     new(0f,                     0f, 0f),
                     new((float)Math.PI / 2,     0f, 0f),
                     new((float)Math.PI,         0f, 0f),
-                    new((float)Math.PI * 1.5f,  0f, 0f) 
+                    new((float)Math.PI * 1.5f,  0f, 0f)
                 }
                 )
         };
@@ -367,6 +367,12 @@ namespace TagTracking {
                             else if (split2[0].Equals("filterSmoothPerTrackerRot")) currentTracker.UpdatePerTrackerFilterRot(val);
                             else if (split2[0].Equals("filterSmoothPerTrackerDepth")) currentTracker.UpdatePerTrackerFilterDepth(val);
                             else if (split2[0].Equals("trackerFollowWeight")) currentTracker.trackerFollowWeight = val;
+                            else if (split2[0].Equals("leftElbowtrackerFollowWeight"))
+                                currentTracker.leftElbowtrackerFollowWeight = val;
+                            else if (split2[0].Equals("rightElbowtrackerFollowWeight"))
+                                currentTracker.rightElbowtrackerFollowWeight = val;
+                            else if (split2[0].Equals("reduceOffset"))
+                                currentTracker.reduceOffset = val;
                             else if (split2[0].Equals("generatedByCalibration")) currentTracker.generatedByCalibration = split2[1].Equals("true");
 
                         } else {
@@ -842,6 +848,22 @@ namespace TagTracking {
                 mat.M41 -= (headPos.X - Program.hmdPos[0]) * trackers[i].trackerFollowWeight;
                 mat.M43 -= (headPos.Y - Program.hmdPos[1]) * trackers[i].trackerFollowWeight;
                 mat.M42 += (headPos.Z - Program.hmdPos[2]) * trackers[i].trackerFollowWeight;
+
+                if (trackers[i].leftElbowtrackerFollowWeight != 0f) {
+                    Vector4 delayElbow = (Program.rightList[0] + Program.shoulderList[0]) / 2f;
+                    Vector3 currElbow = (Program.rightHandPos + Program.shoulderCenterPos) / 2f;
+                    mat.M41 -= (delayElbow.X - currElbow.X) * trackers[i].leftElbowtrackerFollowWeight;
+                    mat.M43 -= (delayElbow.Y - currElbow.Y) * trackers[i].leftElbowtrackerFollowWeight;
+                    mat.M42 += (delayElbow.Z - currElbow.Z) * trackers[i].leftElbowtrackerFollowWeight;
+                }
+                if (trackers[i].rightElbowtrackerFollowWeight != 0f) {
+                    Vector4 delayElbow = (Program.leftList[0] + Program.shoulderList[0]) / 2f;
+                    Vector3 currElbow = (Program.leftHandPos + Program.shoulderCenterPos) / 2f;
+                    mat.M41 -= (delayElbow.X - currElbow.X) * trackers[i].rightElbowtrackerFollowWeight;
+                    mat.M43 -= (delayElbow.Y - currElbow.Y) * trackers[i].rightElbowtrackerFollowWeight;
+                    mat.M42 += (delayElbow.Z - currElbow.Z) * trackers[i].rightElbowtrackerFollowWeight;
+                }
+
                 Vector3 pos = mat.Translation;
                 Quaternion q = mat.Rotation();
                 finals[i].pos = pos;
@@ -984,10 +1006,16 @@ namespace TagTracking {
                     break;
                 }
             }
-            List<int> adjustables = new();
+            List<int> adjustablesFoot = new();
             for (int i = 0; i < finals.Length; i++) {
-                if (!finals[i].name.Equals(Program.poseAdjustWaist)) {
-                    adjustables.Add(i);
+                if (finals[i].name.Contains("foot")) {
+                    adjustablesFoot.Add(i);
+                }
+            }
+            List<int> adjustablesElbow = new();
+            for (int i = 0; i < finals.Length; i++) {
+                if (finals[i].name.Contains("arm")) {
+                    adjustablesElbow.Add(i);
                 }
             }
 
@@ -1003,16 +1031,15 @@ namespace TagTracking {
                 Program.oscClientDebug.Send($"/debug/adjust/position", sendCount, 2, waistMat.Translation.X, waistMat.Translation.Z, waistMat.Translation.Y);
                 sendCount++;
             }
-            //finals[waist].pos = waistMat.Translation;
-            //finals[waist].rot = waistMat.Rotation();
             float legDist = Program.poseAdjustLegDist;
-            for (int i = 0; i < adjustables.Count; i++) {
+            //adjust feet
+            for (int i = 0; i < adjustablesFoot.Count; i++) {
                 bool isIncorrect = false;
                 float lol = Program.timer.ElapsedMilliseconds / 1000f;
                 Matrix4x4 adjmp, adjmr;
 
                 //get pos
-                adjmp = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(finals[adjustables[i]].pos), waistInv);
+                adjmp = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(finals[adjustablesFoot[i]].pos), waistInv);
 
 
                 //Console.WriteLine(adjmp.Translation.Y - waistMat.Translation.Y);
@@ -1028,7 +1055,7 @@ namespace TagTracking {
                 }
 
                 //get rot
-                adjmr = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(finals[adjustables[i]].rot), waistInv);
+                adjmr = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(finals[adjustablesFoot[i]].rot), waistInv);
                 //finals[adjustables[i]].rot = adjmr.Rotation();
 
                 //backwards rotation fix
@@ -1051,9 +1078,9 @@ namespace TagTracking {
                 //vertical rotation fix
                 mat = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(adjmr.Rotation()), Matrix4x4.CreateTranslation(adjmp.Translation));
                 float angleDir = 0;
-                if (finals[adjustables[i]].name.Contains("right")) {
+                if (finals[adjustablesFoot[i]].name.Contains("right")) {
                     angleDir = panAngleR;
-                } else if (finals[adjustables[i]].name.Contains("left")) {
+                } else if (finals[adjustablesFoot[i]].name.Contains("left")) {
                     angleDir = panAngleL;
                 }
                 float vrfX = (float)(legDist * Math.Sin(angleDir));
@@ -1072,7 +1099,7 @@ namespace TagTracking {
 
                 //Console.WriteLine(isIncorrect);
                 if (isIncorrect) {
-                    finals[adjustables[i]].rot = finals[adjustables[i]].prot;
+                    finals[adjustablesFoot[i]].rot = finals[adjustablesFoot[i]].prot;
                     if (Program.debugSendTrackerOSC) {
                         Program.oscClientDebug.Send($"/debug/adjust/position", sendCount, 3, adjmp.Translation.X, adjmp.Translation.Z, adjmp.Translation.Y);
                         sendCount++;
@@ -1083,6 +1110,35 @@ namespace TagTracking {
                         sendCount++;
                     }
                 }
+            }
+            waistMat = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(finals[waist].rot), Matrix4x4.CreateTranslation(finals[waist].pos));
+
+            //this should adjust the rotation of the shoulders, which is this experimental, because shoulder will lose tracking a lot
+            //so implementing somthing like skeleton with ik, should do the trick at predicting where it should be when its lost
+            ////but thats a pain in the ass
+            for (int i = 0; i < adjustablesElbow.Count; i++) {
+                //Vector3 shoulderCenterPos = new Vector3(finals[adjustablesElbow[i]].pos.X, finals[adjustablesElbow[i]].pos.Z, -finals[adjustablesElbow[i]].pos.Y);
+                //Vector3 shoulderCenterPos = new Vector3(finals[adjustablesElbow[i]].pos.X, finals[adjustablesElbow[i]].pos.Z, -finals[adjustablesElbow[i]].pos.Y);
+                //Matrix4x4 look = Matrix4x4.CreateLookAt(Program.shoulderCenterPos, shoulderCenterPos, new Vector3(0, 0, 1));
+                //finals[adjustablesElbow[i]].rot = Quaternion.CreateFromRotationMatrix(look);
+                Matrix4x4 shoulderCenterMatRot = Matrix4x4.CreateFromQuaternion(Quaternion.CreateFromRotationMatrix(waistMat));
+                Matrix4x4.Invert(shoulderCenterMatRot, out Matrix4x4 shoulderCenterInv);
+                Matrix4x4 shoulderCenterMatPos = Matrix4x4.Identity;
+                shoulderCenterMatPos.M41 = Program.shoulderCenterPos.X;
+                shoulderCenterMatPos.M42 = -Program.shoulderCenterPos.Z;
+                shoulderCenterMatPos.M43 = Program.shoulderCenterPos.Y;
+                Matrix4x4 centeredElbow = Matrix4x4.CreateTranslation(finals[adjustablesElbow[i]].pos - shoulderCenterMatPos.Translation);
+                Matrix4x4 normalizedElbow = Matrix4x4.Multiply(centeredElbow, shoulderCenterInv);
+                normalizedElbow.M43 -= normalizedElbow.M43 > 0 ? 0.12f : -0.12f;
+                Matrix4x4 os = normalizedElbow;
+                float angVer = os.Translation.Y;
+                float angHor = (float)Math.Atan2(os.Translation.X, os.Translation.Z);
+                //-0.35     0
+                finals[adjustablesElbow[i]].rot = Quaternion.Lerp(finals[adjustablesElbow[i]].rot, Quaternion.Multiply(
+                    Quaternion.CreateFromAxisAngle(new Vector3(0, 0, 1), angHor), 
+                    Quaternion.CreateFromAxisAngle(new Vector3(0, 1, 0), angVer * -4)),
+                    0.5f);
+                //finals[adjustablesElbow[i]].pos = os.Translation;
             }
 
             //for (int i = 0; i < finals.Length; i++) {

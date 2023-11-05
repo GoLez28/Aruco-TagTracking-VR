@@ -27,7 +27,13 @@ namespace TagTracking {
         public static bool ignoreNoisyRotation = true;
 
         public static float[] hmdPos = new float[3];
+        public static Vector3 shoulderCenterPos = new Vector3();
+        public static Vector3 rightHandPos = new Vector3();
+        public static Vector3 leftHandPos = new Vector3();
         public static float[] hmdRot = new float[3];
+        static int rightHandID = 2;
+        static int leftHandID = 1;
+        static bool needsToSearchHands = false;
 
         public static Matrix4x4 offsetMat = Matrix4x4.Identity;
         public static Vector3 offset {
@@ -40,6 +46,9 @@ namespace TagTracking {
         public static float rotationY = 0;
         public static float rotationZ = 0;
         public static List<Vector4> hmdList = new List<Vector4>();
+        public static List<Vector4> leftList = new List<Vector4>();
+        public static List<Vector4> rightList = new List<Vector4>();
+        public static List<Vector4> shoulderList = new List<Vector4>();
         public static float trackerDelay = 300f;
         public static bool wantToShowFrame = false;
         public static bool adjustOffset = false;
@@ -71,7 +80,7 @@ namespace TagTracking {
 
         public static Stopwatch timer = new Stopwatch();
         public static int nextSave = 10;
-        public static Valve.VR.TrackedDevicePose_t[] devPos = new Valve.VR.TrackedDevicePose_t[4];
+        public static Valve.VR.TrackedDevicePose_t[] devPos = new Valve.VR.TrackedDevicePose_t[10];
         public static Valve.VR.HmdMatrix34_t prevCont = new();
         public static int frameCount = 0;
         public static string infoBarWarning = "";
@@ -191,7 +200,7 @@ namespace TagTracking {
                     if (isMoveKeyPressed) moveTrigger = true;
                     if (isRotateKeyPressed) rotateTrigger = true;
 
-                    //i separate translate offset and rotate offset bc my brain just thinking about matrices
+                    //i separate translate offset and rotate offset bc my brain hurts just thinking about matrices
                     var m2 = devPos[2].mDeviceToAbsoluteTracking;
                     //Console.WriteLine($"{m2.m0:0.00},{m2.m1:0.00},{m2.m2:0.00},{m2.m3:0.00},{m2.m4:0.00},{m2.m5:0.00},{m2.m6:0.00},{m2.m7:0.00},{m2.m8:0.00},{m2.m9:0.00},{m2.m10:0.00},{m2.m11:0.00},");
                     Matrix4x4 d = new();
@@ -229,9 +238,28 @@ namespace TagTracking {
             hmdRot[2] = hmdRotEuler.Z;
 
             float time = timer.ElapsedMilliseconds / 1000000f;
-            hmdList.Add(new Vector4(hmdPosV3.X, hmdPosV3.Y, hmdPosV3.Z, time));
-            while (hmdList.Count > 1 && hmdList[0].W < time - trackerDelay / 1000000f)
+            hmdList.Add(new Vector4(hmdPosV3, time));
+            float timeDiff = time - trackerDelay / 1000000f;
+            while (hmdList.Count > 1 && hmdList[0].W < timeDiff)
                 hmdList.RemoveAt(0);
+
+            m = devPos[leftHandID].mDeviceToAbsoluteTracking;
+            Matrix4x4 leftHandRotMat = new Matrix4x4(m.m0, m.m4, m.m8, 0, m.m1, m.m5, m.m9, 0, m.m2, m.m6, m.m10, 0, m.m3, m.m7, m.m11, 1);
+            leftHandPos = leftHandRotMat.Translation;
+            leftList.Add(new Vector4(leftHandRotMat.Translation, time));
+            while (leftList.Count > 1 && leftList[0].W < timeDiff)
+                leftList.RemoveAt(0);
+            m = devPos[rightHandID].mDeviceToAbsoluteTracking;
+            Matrix4x4 rightHandRotMat = new Matrix4x4(m.m0, m.m4, m.m8, 0, m.m1, m.m5, m.m9, 0, m.m2, m.m6, m.m10, 0, m.m3, m.m7, m.m11, 1);
+            rightHandPos = rightHandRotMat.Translation;
+            rightList.Add(new Vector4(rightHandRotMat.Translation, time));
+            while (rightList.Count > 1 && rightList[0].W < timeDiff)
+                rightList.RemoveAt(0);
+            Matrix4x4 shoulderMat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, -0.09f, 0f)), hmdCentered);
+            shoulderCenterPos = shoulderMat.Translation;
+            shoulderList.Add(new Vector4(shoulderMat.Translation, time));
+            while (shoulderList.Count > 1 && shoulderList[0].W < timeDiff)
+                shoulderList.RemoveAt(0);
 
             Tag.Update();
             Tag.GetTrackers();
@@ -239,14 +267,14 @@ namespace TagTracking {
             //Send OVR Headset, Controller and its offsets
             if (debugSendTrackerOSC) {
                 //lefthand
-                var mlh = devPos[1].mDeviceToAbsoluteTracking;
+                var mlh = devPos[leftHandID].mDeviceToAbsoluteTracking;
                 Matrix4x4 hmdRotMatLH = new Matrix4x4(mlh.m0, mlh.m4, mlh.m8, 0, mlh.m1, mlh.m5, mlh.m9, 0, mlh.m2, mlh.m6, mlh.m10, 0, mlh.m3, mlh.m7, mlh.m11, 1);
                 Vector3 hmdPosV3LH = hmdRotMatLH.Translation;
                 oscClientDebug.Send("/debug/final/position", 8,
                                    hmdPosV3LH.X, hmdPosV3LH.Y, -hmdPosV3LH.Z, //1f, 1.7f, 1f
                                    0, 0, 0, 1);
                 //righthand
-                var mrh = devPos[2].mDeviceToAbsoluteTracking;
+                var mrh = devPos[rightHandID].mDeviceToAbsoluteTracking;
                 Matrix4x4 hmdRotMatRH = new Matrix4x4(mrh.m0, mrh.m4, mrh.m8, 0, mrh.m1, mrh.m5, mrh.m9, 0, mrh.m2, mrh.m6, mrh.m10, 0, mrh.m3, mrh.m7, mrh.m11, 1);
                 Vector3 hmdPosV3RH = hmdRotMatRH.Translation;
                 oscClientDebug.Send("/debug/final/position", 7,
@@ -258,30 +286,38 @@ namespace TagTracking {
                                    0, 0, 0, 1);
 
                 Matrix4x4 mat = hmdRotMat;
-                mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), mat);
-                //mat.M42 = hmdRotMat.M42;
+                //mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), mat);
+                ////mat.M42 = hmdRotMat.M42;
                 Vector3 matT = mat.Translation;
                 oscClientDebug.Send("/debug/final/position", 9,
                                            matT.X, matT.Y, -matT.Z, //1f, 1.7f, 1f
                                            0, 0, 0, 1);
-
                 int waist = -1;
                 for (int i = 0; i < Tag.finals.Length; i++) {
                     if (Tag.finals[i].name.Equals(poseAdjustWaist))
                         waist = i;
                 }
                 Vector3 pos = Tag.finals[waist].fpos;
-                Quaternion q = Tag.finals[waist].frot;
-                Matrix4x4 matw = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(q), Matrix4x4.CreateTranslation(pos));
-                matw = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-0.15f, 0f, 0f)), matw);
+
+                mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, -0.09f, 0f)), hmdCentered);
                 oscClientDebug.Send("/debug/final/position", 6,
-                                           matw.Translation.X, matw.Translation.Z, matw.Translation.Y, //1f, 1.7f, 1f
-                                           -q.X, -q.Z, -q.Y, q.W);
+                                           mat.Translation.X, mat.Translation.Y, -mat.Translation.Z, //1f, 1.7f, 1f
+                                           0, 0, 0, 1);
+
+                //Quaternion q = Tag.finals[waist].frot;
+                //Matrix4x4 matw = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(q), Matrix4x4.CreateTranslation(pos));
+                //matw = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-0.15f, 0f, 0f)), matw);
+                //oscClientDebug.Send("/debug/final/position", 6,
+                //                           matw.Translation.X, matw.Translation.Z, matw.Translation.Y, //1f, 1.7f, 1f
+                //                           -q.X, -q.Z, -q.Y, q.W);
             }
             if (autoOffset) {
                 AdjustOffset(hmdRotMat);
                 autoOffset = false;
                 Console.WriteLine("Adjusted offsets");
+            }
+            if (needsToSearchHands) {
+                SearchHands(hmdCentered);
             }
             mainThreadBenchmark.Stop();
             threadsWorkTime[0] = mainThreadBenchmark.Elapsed.TotalMilliseconds;
@@ -295,6 +331,39 @@ namespace TagTracking {
             frameCount++;
 
             return previousTime;
+        }
+        static void SearchHands(Matrix4x4 hmdCentered) {
+            needsToSearchHands = false;
+            Matrix4x4 matLeft = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0.5f, 0f, 0f)), hmdCentered);
+            Matrix4x4 matRight = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-0.5f, 0f, 0f)), hmdCentered);
+            float minLeftDist = 99999999999;
+            int minLeftID = 1;
+            float minRightDist = 99999999999;
+            int minRightID = 2;
+            for (int i = 1; i < devPos.Length; i++) {
+                //vmt doesnt send velocities, so filter those out
+                if (devPos[i].vVelocity.v0 == 0 || devPos[i].vVelocity.v1 == 0 || devPos[i].vVelocity.v2 == 0) continue;
+                if (devPos[i].vAngularVelocity.v0 == 0 || devPos[i].vAngularVelocity.v1 == 0 || devPos[i].vAngularVelocity.v2 == 0) continue;
+                var m = devPos[i].mDeviceToAbsoluteTracking;
+                Matrix4x4 rotMat = new Matrix4x4(m.m0, m.m4, m.m8, 0, m.m1, m.m5, m.m9, 0, m.m2, m.m6, m.m10, 0, m.m3, m.m7, m.m11, 1);
+                Vector3 dPos = rotMat.Translation;
+                float distL = Utils.GetDistance(dPos.X, dPos.Y, dPos.Z, matLeft.Translation.X, matLeft.Translation.Y, matLeft.Translation.Z);
+                float distR = Utils.GetDistance(dPos.X, dPos.Y, dPos.Z, matRight.Translation.X, matRight.Translation.Y, matRight.Translation.Z);
+                if (distL < minLeftDist) {
+                    minLeftDist = distL;
+                    minLeftID = i;
+                }
+                if (distR < minRightDist) {
+                    minRightDist = distR;
+                    minRightID = i;
+                }
+            }
+            if (minLeftID == minRightID) {
+                Console.WriteLine("Somthing went wrong getting hands...");
+                return;
+            }
+            leftHandID = minLeftID;
+            rightHandID = minRightID;
         }
 
         private static void SlowTickLoop(double delta) {
@@ -524,6 +593,9 @@ namespace TagTracking {
             } else if (key == ConsoleKey.H) {
                 performanceMode = !performanceMode;
                 Console.WriteLine($"Performance Mode: " + Show(performanceMode));
+            } else if (key == ConsoleKey.G) {
+                needsToSearchHands = true;
+                Console.WriteLine($"Searching hands");
             } else if (key == ConsoleKey.Q) {
                 offsetMat.M41 -= 0.01f;
                 Console.WriteLine($"Decreased X offset {offsetMat.M41}");
