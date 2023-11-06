@@ -219,45 +219,22 @@ namespace TagTracking {
                     prevCont = m2;
                 }
             }
-            var m = devPos[0].mDeviceToAbsoluteTracking;
-            //Save only the HMD
-            Matrix4x4 hmdRotMat = new Matrix4x4(m.m0, m.m4, m.m8, 0, m.m1, m.m5, m.m9, 0, m.m2, m.m6, m.m10, 0, m.m3, m.m7, m.m11, 1);
-            if (useVRChatOSCTrackers || true) {
-                Vector3 headInOffset = new Vector3(0, 0, 0.1f);
-                hmdRotMat = Matrix4x4.Multiply(hmdRotMat, Matrix4x4.CreateTranslation(headInOffset));
-            }
-            Matrix4x4 hmdCentered = hmdRotMat;
-            hmdCentered = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), hmdCentered);
-            Vector3 hmdPosV3 = hmdCentered.Translation;
-            hmdPos[0] = hmdPosV3.X;
-            hmdPos[1] = hmdPosV3.Y;
-            hmdPos[2] = hmdPosV3.Z;
-            Vector3 hmdRotEuler = Tag.ToEulerAngles(Quaternion.CreateFromRotationMatrix(hmdCentered));
-            hmdRot[0] = hmdRotEuler.X;
-            hmdRot[1] = hmdRotEuler.Y;
-            hmdRot[2] = hmdRotEuler.Z;
+            Matrix4x4 hmdRotMat, hmdCentered;
+            Vector3 hmdPosV3;
+            GetDevices(out hmdRotMat, out hmdCentered, out hmdPosV3);
 
             float time = timer.ElapsedMilliseconds / 1000000f;
-            hmdList.Add(new Vector4(hmdPosV3, time));
             float timeDiff = time - trackerDelay / 1000000f;
+            hmdList.Add(new Vector4(hmdPosV3, time));
             while (hmdList.Count > 1 && hmdList[0].W < timeDiff)
                 hmdList.RemoveAt(0);
-
-            m = devPos[leftHandID].mDeviceToAbsoluteTracking;
-            Matrix4x4 leftHandRotMat = new Matrix4x4(m.m0, m.m4, m.m8, 0, m.m1, m.m5, m.m9, 0, m.m2, m.m6, m.m10, 0, m.m3, m.m7, m.m11, 1);
-            leftHandPos = leftHandRotMat.Translation;
-            leftList.Add(new Vector4(leftHandRotMat.Translation, time));
+            leftList.Add(new Vector4(leftHandPos, time));
             while (leftList.Count > 1 && leftList[0].W < timeDiff)
                 leftList.RemoveAt(0);
-            m = devPos[rightHandID].mDeviceToAbsoluteTracking;
-            Matrix4x4 rightHandRotMat = new Matrix4x4(m.m0, m.m4, m.m8, 0, m.m1, m.m5, m.m9, 0, m.m2, m.m6, m.m10, 0, m.m3, m.m7, m.m11, 1);
-            rightHandPos = rightHandRotMat.Translation;
-            rightList.Add(new Vector4(rightHandRotMat.Translation, time));
+            rightList.Add(new Vector4(rightHandPos, time));
             while (rightList.Count > 1 && rightList[0].W < timeDiff)
                 rightList.RemoveAt(0);
-            Matrix4x4 shoulderMat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, -0.09f, 0f)), hmdCentered);
-            shoulderCenterPos = shoulderMat.Translation;
-            shoulderList.Add(new Vector4(shoulderMat.Translation, time));
+            shoulderList.Add(new Vector4(shoulderCenterPos, time));
             while (shoulderList.Count > 1 && shoulderList[0].W < timeDiff)
                 shoulderList.RemoveAt(0);
 
@@ -332,6 +309,38 @@ namespace TagTracking {
 
             return previousTime;
         }
+        public static void GetDevices() {
+            GetDevices(out Matrix4x4 a, out Matrix4x4 b, out Vector3 c);
+        }
+        public static void GetDevices(out Matrix4x4 hmdRotMat, out Matrix4x4 hmdCentered, out Vector3 hmdPosV3) {
+            var m = devPos[0].mDeviceToAbsoluteTracking;
+            //Save only the HMD
+            hmdRotMat = new Matrix4x4(m.m0, m.m4, m.m8, 0, m.m1, m.m5, m.m9, 0, m.m2, m.m6, m.m10, 0, m.m3, m.m7, m.m11, 1);
+            if (useVRChatOSCTrackers || true) {
+                Vector3 headInOffset = new Vector3(0, 0, 0.1f);
+                hmdRotMat = Matrix4x4.Multiply(hmdRotMat, Matrix4x4.CreateTranslation(headInOffset));
+            }
+            hmdCentered = hmdRotMat;
+            hmdCentered = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), hmdCentered);
+            hmdPosV3 = hmdCentered.Translation;
+            hmdPos[0] = hmdPosV3.X;
+            hmdPos[1] = hmdPosV3.Y;
+            hmdPos[2] = hmdPosV3.Z;
+            Vector3 hmdRotEuler = Tag.ToEulerAngles(Quaternion.CreateFromRotationMatrix(hmdCentered));
+            hmdRot[0] = hmdRotEuler.X;
+            hmdRot[1] = hmdRotEuler.Y;
+            hmdRot[2] = hmdRotEuler.Z;
+
+            m = devPos[leftHandID].mDeviceToAbsoluteTracking;
+            Matrix4x4 leftHandRotMat = new Matrix4x4(m.m0, m.m4, m.m8, 0, m.m1, m.m5, m.m9, 0, m.m2, m.m6, m.m10, 0, m.m3, m.m7, m.m11, 1);
+            leftHandPos = leftHandRotMat.Translation;
+            m = devPos[rightHandID].mDeviceToAbsoluteTracking;
+            Matrix4x4 rightHandRotMat = new Matrix4x4(m.m0, m.m4, m.m8, 0, m.m1, m.m5, m.m9, 0, m.m2, m.m6, m.m10, 0, m.m3, m.m7, m.m11, 1);
+            rightHandPos = rightHandRotMat.Translation;
+            Matrix4x4 shoulderMat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, -0.09f, 0f)), hmdCentered);
+            shoulderCenterPos = shoulderMat.Translation;
+        }
+
         static void SearchHands(Matrix4x4 hmdCentered) {
             needsToSearchHands = false;
             Matrix4x4 matLeft = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0.5f, 0f, 0f)), hmdCentered);

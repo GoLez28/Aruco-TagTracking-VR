@@ -121,6 +121,11 @@ namespace TagTracking {
                 for (int i = 0; i < trackers.Length; i++) {
                     if (Program.debugShowCamerasPosition && Program.debugTrackerToBorrow == i) continue;
                     (Vector3 pos, Quaternion q) = trackers[i].GetEstimatedPosition();
+                    Matrix4x4 preSmooth = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(q), Matrix4x4.CreateTranslation(pos));
+                    Program.GetDevices();
+                    preSmooth = Tag.GetOffsetTracker(preSmooth, Tag.trackers[i].trackerFollowWeight, Tag.trackers[i].leftElbowtrackerFollowWeight, Tag.trackers[i].rightElbowtrackerFollowWeight);
+                    pos = preSmooth.Translation;
+                    q = Quaternion.CreateFromRotationMatrix(preSmooth);
                     //Quaternion q = trackers[i].rotation;
                     Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
                                                         pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f

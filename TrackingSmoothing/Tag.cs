@@ -425,7 +425,7 @@ namespace TagTracking {
             }
         }
 
-        
+
 
         public static void GetTrackers() {
             if (finals == null) return;
@@ -433,25 +433,6 @@ namespace TagTracking {
             for (int i = 0; i < trackers.Length; i++) {
                 Matrix4x4 mat = trackers[i].Obtain();
                 finals[i].preMat = mat;
-                mat = Matrix4x4.Multiply(mat, Program.offsetMat);
-                mat.M41 -= (headPos.X - Program.hmdPos[0]) * trackers[i].trackerFollowWeight;
-                mat.M43 -= (headPos.Y - Program.hmdPos[1]) * trackers[i].trackerFollowWeight;
-                mat.M42 += (headPos.Z - Program.hmdPos[2]) * trackers[i].trackerFollowWeight;
-
-                if (trackers[i].leftElbowtrackerFollowWeight != 0f) {
-                    Vector4 delayElbow = (Program.rightList[0] + Program.shoulderList[0]) / 2f;
-                    Vector3 currElbow = (Program.rightHandPos + Program.shoulderCenterPos) / 2f;
-                    mat.M41 -= (delayElbow.X - currElbow.X) * trackers[i].leftElbowtrackerFollowWeight;
-                    mat.M43 -= (delayElbow.Y - currElbow.Y) * trackers[i].leftElbowtrackerFollowWeight;
-                    mat.M42 += (delayElbow.Z - currElbow.Z) * trackers[i].leftElbowtrackerFollowWeight;
-                }
-                if (trackers[i].rightElbowtrackerFollowWeight != 0f) {
-                    Vector4 delayElbow = (Program.leftList[0] + Program.shoulderList[0]) / 2f;
-                    Vector3 currElbow = (Program.leftHandPos + Program.shoulderCenterPos) / 2f;
-                    mat.M41 -= (delayElbow.X - currElbow.X) * trackers[i].rightElbowtrackerFollowWeight;
-                    mat.M43 -= (delayElbow.Y - currElbow.Y) * trackers[i].rightElbowtrackerFollowWeight;
-                    mat.M42 += (delayElbow.Z - currElbow.Z) * trackers[i].rightElbowtrackerFollowWeight;
-                }
 
                 Vector3 pos = mat.Translation;
                 Quaternion q = mat.Rotation();
@@ -498,19 +479,54 @@ namespace TagTracking {
                 AdjustPose();
             for (int i = 0; i < trackers.Length; i++) {
                 finals[i].Update();
+
+                Matrix4x4 preSmooth = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(finals[i].frot), Matrix4x4.CreateTranslation(finals[i].fpos));
+                if (!Program.useInterpolation)
+                    preSmooth = GetOffsetTracker(preSmooth, trackers[i].trackerFollowWeight, trackers[i].leftElbowtrackerFollowWeight, trackers[i].rightElbowtrackerFollowWeight);
+                Vector3 pos = preSmooth.Translation;
+                Quaternion q = preSmooth.Rotation();
+                finals[i].fpos = pos;
+                finals[i].frot = q;
+
+
                 Matrix4x4 previewMat = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(finals[i].frot), Matrix4x4.CreateTranslation(finals[i].fpos));
                 Matrix4x4 inv;
                 Matrix4x4.Invert(Program.offsetMat, out inv);
                 Matrix4x4 mat = Matrix4x4.Multiply(previewMat, inv);
-                mat.M41 += (headPos.X - Program.hmdPos[0]) * trackers[i].trackerFollowWeight;
-                mat.M43 += (headPos.Y - Program.hmdPos[1]) * trackers[i].trackerFollowWeight;
-                mat.M42 -= (headPos.Z - Program.hmdPos[2]) * trackers[i].trackerFollowWeight;
+                //mat.M41 += (headPos.X - Program.hmdPos[0]) * trackers[i].trackerFollowWeight;
+                //mat.M43 += (headPos.Y - Program.hmdPos[1]) * trackers[i].trackerFollowWeight;
+                //mat.M42 -= (headPos.Z - Program.hmdPos[2]) * trackers[i].trackerFollowWeight;
                 Aruco.DrawCube(mat);
                 //Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
                 //                            pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
                 //                            -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
             }
             newInfo = false;
+        }
+
+        public static Matrix4x4 GetOffsetTracker(Matrix4x4 mat, float headWeight, float leftHandWeight = 1, float rightHandWeight = 1) {
+            Vector4 headPos = Program.hmdList[0];
+            mat = Matrix4x4.Multiply(mat, Program.offsetMat);
+            mat.M41 -= (headPos.X - Program.hmdPos[0]) * headWeight;
+            mat.M43 -= (headPos.Y - Program.hmdPos[1]) * headWeight;
+            mat.M42 += (headPos.Z - Program.hmdPos[2]) * headWeight;
+
+            if (leftHandWeight != 0f) {
+                Vector4 delayElbow = (Program.rightList[0] + Program.shoulderList[0]) / 2f;
+                Vector3 currElbow = (Program.rightHandPos + Program.shoulderCenterPos) / 2f;
+                mat.M41 -= (delayElbow.X - currElbow.X) * leftHandWeight;
+                mat.M43 -= (delayElbow.Y - currElbow.Y) * leftHandWeight;
+                mat.M42 += (delayElbow.Z - currElbow.Z) * leftHandWeight;
+            }
+            if (rightHandWeight != 0f) {
+                Vector4 delayElbow = (Program.leftList[0] + Program.shoulderList[0]) / 2f;
+                Vector3 currElbow = (Program.leftHandPos + Program.shoulderCenterPos) / 2f;
+                mat.M41 -= (delayElbow.X - currElbow.X) * rightHandWeight;
+                mat.M43 -= (delayElbow.Y - currElbow.Y) * rightHandWeight;
+                mat.M42 += (delayElbow.Z - currElbow.Z) * rightHandWeight;
+            }
+
+            return mat;
         }
 
         public static void SendTrackers() {
@@ -724,7 +740,7 @@ namespace TagTracking {
                 float angHor = (float)Math.Atan2(os.Translation.X, os.Translation.Z);
                 //-0.35     0
                 finals[adjustablesElbow[i]].rot = Quaternion.Lerp(finals[adjustablesElbow[i]].rot, Quaternion.Multiply(
-                    Quaternion.CreateFromAxisAngle(new Vector3(0, 0, 1), angHor), 
+                    Quaternion.CreateFromAxisAngle(new Vector3(0, 0, 1), angHor),
                     Quaternion.CreateFromAxisAngle(new Vector3(0, 1, 0), angVer * -4)),
                     0.5f);
                 //finals[adjustablesElbow[i]].pos = os.Translation;
