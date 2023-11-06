@@ -376,7 +376,7 @@ namespace TagTracking {
                 Program.threadsWorkTime[c + 2] = arucoThreadWorkBenchmark.Elapsed.TotalMilliseconds;
                 Program.threadsIdleTime[c + 2] = arucoThreadIdleBenchmark.Elapsed.TotalMilliseconds;
             }
-            static VectorOfVectorOfPointF AdjustDetectedRectsToLowRes (VectorOfVectorOfPointF corners, float xRatio, float yRatio) {
+            static VectorOfVectorOfPointF AdjustDetectedRectsToLowRes(VectorOfVectorOfPointF corners, float xRatio, float yRatio) {
                 PointF[][] rects = new PointF[corners.Size][];
                 for (int i = 0; i < corners.Size; i++) {
                     rects[i] = new PointF[4];
@@ -553,14 +553,27 @@ namespace TagTracking {
             asdsds.CopyTo(valwewewues);
             VectorOfDouble rvec2 = new VectorOfDouble(new double[] { valwewewues[0], valwewewues[1], valwewewues[2] }); //pitch roll yaw
             VectorOfDouble tvec2 = new VectorOfDouble(new double[] { pos.X * 1000f, pos.Y * 1000f, pos.Z * 1000f });
-            if (queueCount[cam] == maxQueue) return;
-            posQueue[cam][queueCount[cam]] = tvec2;
-            rotQueue[cam][queueCount[cam]] = rvec2;
-            typeQueue[cam][queueCount[cam]] = type;
+            int listIndex = queueCount[cam];
+            bool foundSpot = false;
+            if (queueCount[cam] == maxQueue) {
+                for (int i = 0; i < typeQueue[cam].Length; i++) {
+                    if (typeQueue[cam][i] == Draw.ShapeType.AxisGray) {
+                        foundSpot = true;
+                        listIndex = i;
+                        break;
+                    }
+                }
+                if (!foundSpot)
+                    return;
+            }
+            posQueue[cam][listIndex] = tvec2;
+            rotQueue[cam][listIndex] = rvec2;
+            typeQueue[cam][listIndex] = type;
             if (scl == 0)
                 scl = 0.1f;
-            sclQueue[cam][queueCount[cam]] = scl * 3;
-            queueCount[cam]++;
+            sclQueue[cam][listIndex] = scl * 3;
+            if (!foundSpot)
+                queueCount[cam]++;
         }
         static Mat GetRotationMatrixFromRotationVector(VectorOfDouble rvec) {
             Mat rmat = new Mat();

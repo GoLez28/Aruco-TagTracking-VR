@@ -290,9 +290,10 @@ namespace TagTracking {
                     prevMat[i] = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(estimatedRot[i]), Matrix4x4.CreateTranslation(estimatedPos0[i]));
                     //draw current trackers
                     if (!float.IsNaN(estimatedRot[i].X) && !float.IsNaN(estimatedPos0[i].X) && (Program.frameCount / 8) % 1 == 0) {
-                        if (updateCount[i] > 3)
-                            Aruco.DrawAxisGray(prevMat[i], Utils.GetMap(trackerPresence[i], 0, 100, 1f, 0.2f));
-                        else
+                        if (updateCount[i] > 3) {
+                            if (updateCount[i] < 50)
+                                Aruco.DrawAxisGray(prevMat[i], Utils.GetMap(trackerPresence[i], 0, 100, 1f, 0.2f));
+                        } else
                             Aruco.DrawAxis(prevMat[i], Utils.GetMap(trackerPresence[i], 0, 100, 1f, 0.2f));
                     }
 
@@ -454,7 +455,7 @@ namespace TagTracking {
                         }
 
 
-                        trackerOffsetsMat[i + j] = Matrix4x4.CreateTranslation(trackerOffsets[ix2] * (1f-reduceOffset));
+                        trackerOffsetsMat[i + j] = Matrix4x4.CreateTranslation(trackerOffsets[ix2] * (1f - reduceOffset));
                     }
                 }
             }
