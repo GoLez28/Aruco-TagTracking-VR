@@ -187,7 +187,7 @@ namespace TagTracking {
                         yRatio = (float)Tag.cameras[c].height / (float)Tag.cameras[c].rsHeight;
                     }
                 }
-                if (Program.performanceMode) {
+                if (Program.performanceMode && Program.performanceUnderSample > 1) {
                     if (correctRes) {
                         newRsWidth = (int)(newRsWidth / Program.performanceUnderSample);
                         newRsHeight = (int)(newRsHeight / Program.performanceUnderSample);
