@@ -8,140 +8,6 @@ using System.IO;
 
 namespace TagTracking {
     static partial class Tag {
-        public class FinalTracker {
-            public Vector3 pos;
-            public Quaternion rot;
-            public Quaternion prot;
-            public Matrix4x4 preMat;
-            public string name;
-
-            public Vector3 fpos;
-            public Quaternion frot;
-            public Vector3 pfpos;
-            public Quaternion pfrot;
-            public float pVel;
-            public float rVel;
-            public float velScore;
-
-            public OneEuroFilter<Vector3> smoothedPos = new OneEuroFilter<Vector3>(2); //w 25
-            public OneEuroFilter<Quaternion> smoothedRot = new OneEuroFilter<Quaternion>(5); //w 150
-            public List<Quaternion> rotList = new();
-            public List<Vector3> posList = new();
-            public Vector3 alwaysSmoothed = new Vector3();
-            public Vector3 smoothPrevPos = new Vector3();
-            public Quaternion smoothPrevRot = new Quaternion();
-            public float avgSmoothDistTrigger = 0.025f; //w 0.05
-            public float avgSmoothVal = 0.2f; //w 0.04
-            public float avgSmoothRecoverVal = 0.9f;
-            public float avgSmoothAlwaysVal = 0.08f;
-            public float maxSpikePosDist = 0.5f;
-            public float maxSpikeRotDiff = 0.9f;
-
-            public FinalTracker(Vector3 pos, Quaternion rot, Quaternion prot, string name) {
-                this.pos = pos;
-                this.rot = rot;
-                this.prot = prot;
-                this.name = name;
-            }
-
-            public void Update() {
-                if (Program.postNoise == 0) {
-                    fpos = pos;
-                    frot = rot;
-                    return;
-                }
-                pfpos = fpos;
-                pfrot = frot;
-
-                //filter rotation spikes
-                rotList.Insert(0, rot);
-                if (rotList.Count > 10)
-                    rotList.RemoveAt(rotList.Count - 1);
-                List<Quaternion> r1List = new List<Quaternion>();
-                List<Quaternion> r2List = new List<Quaternion>();
-                Quaternion lastRot = rotList[0];
-                r1List.Add(lastRot);
-                bool switched = false;
-                for (int i = 1; i < rotList.Count; i++) {
-                    Quaternion curRot = rotList[i];
-                    float rotDiff = Quaternion.Dot(Quaternion.Inverse(lastRot) * curRot, Quaternion.Identity);
-                    if (rotDiff < 0.9f) {
-                        switched = !switched;
-                    }
-                    if (switched) r2List.Add(curRot);
-                    else r1List.Add(curRot);
-                    lastRot = curRot;
-                }
-                if (r1List.Count < r2List.Count && Program.preNoise != 0) {
-                    if (r2List.Count > 7) rot = r2List[0];
-                }
-
-                //filter position spikes
-                posList.Insert(0, pos);
-                if (posList.Count > 10)
-                    posList.RemoveAt(posList.Count - 1);
-                List<Vector3> p1List = new List<Vector3>();
-                List<Vector3> p2List = new List<Vector3>();
-                Vector3 lastPos = posList[0];
-                p1List.Add(lastPos);
-                switched = false;
-                for (int i = 1; i < posList.Count; i++) {
-                    Vector3 curPos = posList[i];
-                    float posDist = Utils.GetDistance(lastPos.X, lastPos.Y, lastPos.Z, curPos.X, curPos.Y, curPos.Z);
-                    if (posDist > 0.05f) {
-                        switched = !switched;
-                    }
-                    if (switched) p2List.Add(curPos);
-                    else p1List.Add(curPos);
-                    lastPos = curPos;
-                }
-                if (p1List.Count < p2List.Count && Program.preNoise != 0) {
-                    if (p2List.Count > 7) pos = p2List[0];
-                }
-
-                //one euro filtering
-                if (!float.IsNaN(rot.X)) {
-                    if (float.IsNaN(smoothedRot.currValue.X))
-                        smoothedRot = new OneEuroFilter<Quaternion>(smoothedRot.freq);
-                    Quaternion frotf = smoothedRot.Filter(Quaternion.Normalize(rot));
-
-                    if (float.IsNaN(smoothPrevRot.X))
-                        smoothPrevRot = rot;
-                    float dot = Math.Abs(Quaternion.Dot(rot, frotf));
-                    float sqrtFreq = (float)Math.Sqrt(smoothedRot.freq);
-                    float end = (float)Math.Pow(dot / 1.5f, sqrtFreq);
-                    frot = Quaternion.Slerp(smoothPrevRot, rot, end);
-                }
-                if (!float.IsNaN(pos.X))
-                    fpos = smoothedPos.Filter(pos);
-
-                //make an average filtering
-                float distTh = avgSmoothDistTrigger; //0.0004f
-                float smoothiness = avgSmoothVal;
-                alwaysSmoothed += (fpos - alwaysSmoothed) * avgSmoothAlwaysVal;
-                if (Utils.GetDistance(fpos.X, fpos.Y, fpos.Z, alwaysSmoothed.X, alwaysSmoothed.Y, alwaysSmoothed.Z) > distTh) {
-                    smoothiness = avgSmoothRecoverVal;
-                }
-                smoothPrevPos += (fpos - smoothPrevPos) * smoothiness;
-                fpos = smoothPrevPos;
-
-                float smoothinessRot = smoothiness + (1 - smoothiness) / 2; //to be less smoothed
-                smoothinessRot = smoothinessRot * 0.8f + smoothiness * 0.2f;
-                smoothPrevRot = Quaternion.Lerp(smoothPrevRot, frot, smoothinessRot);
-                smoothPrevRot = Quaternion.Normalize(smoothPrevRot);
-                frot = smoothPrevRot;
-
-                if (dynamicFiltering) {
-                    pVel = (fpos - pfpos).Length();
-                    rVel = (1f - Quaternion.Dot(frot, pfrot)) * 7f;
-                    velScore += rVel;
-                    velScore += pVel * 0.6f;
-                    velScore -= 0.015f;
-                    if (velScore < 0) velScore = 0;
-                    else if (velScore > 1) velScore = 1;
-                }
-            }
-        }
         public class RecieveTag {
             public Matrix4x4 rot;
             public Vector3 pos;
@@ -251,10 +117,10 @@ namespace TagTracking {
                 }
                 )
         };
-        public static List<CombinedTracker> combinedTrackers = new();
         public static CombinedTracker[] rawTrackers = new CombinedTracker[] {
             new(0), new(1), new(2), new(3), new(4), new(5), new(6), new(7), new(8), new(9), new(10), new(11), new(12), new(13), new(14), new(15)
         };
+        public static List<CombinedTracker> combinedTrackers = new();
         public static int[] tagToCalibrate = new int[] { 0, 2, 4, 6 };
         public static int[] tagsOnFloor = new int[] { 0, 2, 4, 6 };
         public static float[] tagToCalibrateWeight = new float[] { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
@@ -262,23 +128,12 @@ namespace TagTracking {
         public static bool newInfoReady = false;
         public static bool newInfo = false;
 
-        public static bool refineSearch = true;
-        public static int refineIterations = 7;
-
-        public static bool endedSearching = true;
-        public static double saveMatTime = -40000;
-
         public static double[] lastFrameTime;
         public static int lastCamera = 0;
         public static int lastIndex = 0;
         public static double[] cameraTPS = new double[2];
 
-        public static bool getSnapshot = false;
-        public static int getRawTrackersStep = -1;
-        public static bool newTrackersReady = false;
-        public static bool addNewRaw = false;
-        public static long lastTimeGetRaw = 0;
-        public static bool timedSnapshot = false;
+
         public static bool dynamicFiltering = true;
         public static void SaveMatrix() {
             Console.WriteLine("Saving...");
@@ -467,7 +322,7 @@ namespace TagTracking {
                 TrackerCalibrate.GetTrackerEnd();
             }
             if (Program.debugSendTrackerOSC) {
-                if (Program.timer.ElapsedMilliseconds - saveMatTime < 15000) {
+                if (Program.timer.ElapsedMilliseconds - RoomCalibrate.saveMatTime < 15000) {
                     SendSingleTrackersOSC();
                 } else {
                     for (int i = 0; i < rawTrackers.Length; i++) {
@@ -484,68 +339,9 @@ namespace TagTracking {
             }
             newInfo = true;
 
-            if (getRawTrackersStep > -1) {
-                if (timedSnapshot) {
-                    if (Program.timer.ElapsedMilliseconds - lastTimeGetRaw > 3000) {
-                        addNewRaw = true;
-                        lastTimeGetRaw = Program.timer.ElapsedMilliseconds;
-                    }
-                }
-                bool ready = false;
-                int addCount = 0;
-                List<string> trackersName = new();
-                List<int> trackerId = new();
-                for (int i = 0; i < trackers.Length; i++) {
-                    for (int j = 0; j < trackers[i].trackers.Length; j++) {
-                        CombinedTracker cbt = trackers[i].trackers[j];
-                        bool lessThan = true;
-                        for (int k = 0; k < cbt.updateCount.Length; k++) {
-                            if (cbt.updateCount[k] > 2) {
-                                lessThan = false;
-                                break;
-                            }
-                        }
-                        if (lessThan) {
-                            ready = true;
-                        }
-                        if (lessThan && addNewRaw) {
-                            addCount++;
-                            CombinedTracker cbt2 = new CombinedTracker(cbt.index);
-                            //search for name and id
-                            for (int k = 0; k < trackers.Length; k++) {
-                                for (int l = 0; l < trackers[k].trackerIndex.Length; l++) {
-                                    if (trackers[k].trackerIndex[l] == cbt2.index) {
-                                        trackersName.Add(trackers[k].trackerName);
-                                        trackerId.Add(cbt2.index);
-                                        break;
-                                    }
-                                }
-                            }
-                            for (int k = 0; k < cbt.singles.Length; k++) {
-                                cbt2.Recieve(k, cbt.singles[k].pos, cbt.singles[k].rot, -1);
-                            }
-                            combinedTrackers.Add(cbt2);
-                        }
-                    }
-                }
-                if (addNewRaw && addCount > 0) {
-                    Console.WriteLine($"Added {addCount}, total: {combinedTrackers.Count}");
-                    for (int i = 0; i < trackersName.Count; i++) {
-                        Console.WriteLine($"\t{trackersName[i]}: {trackerId[i]}");
-                    }
-                }
-                addNewRaw = false;
-                if (ready && !newTrackersReady) {
-                    newTrackersReady = true;
-                    Console.WriteLine("Trackers OK");
-                } else if (!ready && newTrackersReady) {
-                    newTrackersReady = false;
-                    Console.WriteLine("Trackers Missing");
-                }
-                newTrackersReady = ready;
-            }
+            RoomCalibrate.GetCalibrationTags();
         }
-        private static void SendSingleTrackersOSC() {
+        public static void SendSingleTrackersOSC() {
             if (!Program.debugSendTrackerOSC) {
                 return;
             }
@@ -617,63 +413,7 @@ namespace TagTracking {
                     }
                 }
             }
-            if (index == 0 && altRot == -1)
-                if (Program.timer.ElapsedMilliseconds - saveMatTime < 15000) {
-                    Vector3 vec = pos * cameras[camera].depthMult;
-                    Matrix4x4 vecMat = Matrix4x4.CreateTranslation(vec);
-                    Matrix4x4 newMat = Matrix4x4.Multiply(rot, vecMat);
-                    Matrix4x4 invMat;
-                    Matrix4x4.Invert(newMat, out invMat);
-                    string message = $"                              ";
-                    ApplyNewMatrix(camera, invMat, message);
-                    Random rnd = new Random();
-                    //System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
-                    //sw.Start();
-                    for (int i = 0; i < 10; i++) {
-                        //cameras[camera].matrix.CopyTo(invMat);
-                        Matrix4x4 newRot = Matrix4x4.CreateFromYawPitchRoll(
-                            (float)(rnd.NextDouble() - 0.5) / (10000f / cameras[camera].minScore),
-                            (float)(rnd.NextDouble() - 0.5) / (10000f / cameras[camera].minScore),
-                            (float)(rnd.NextDouble() - 0.5) / (10000f / cameras[camera].minScore));
-                        Vector3 newTran = new Vector3(
-                            (float)(rnd.NextDouble() - 0.5) / (100f / cameras[camera].minScore),
-                            (float)(rnd.NextDouble() - 0.5) / (100f / cameras[camera].minScore),
-                            (float)(rnd.NextDouble() - 0.5) / (100f / cameras[camera].minScore));
-                        Matrix4x4 newRotd = Matrix4x4.Multiply(newRot, Matrix4x4.CreateTranslation(newTran));
-
-                        Matrix4x4 invMat2;
-                        int ite = 0;
-                        do {
-                            rot = Matrix4x4.Multiply(rot, newRot);
-                            Matrix4x4 newMat2 = Matrix4x4.Multiply(rot, vecMat);
-                            //Vector3 possss = invMat.Translation;
-                            Matrix4x4.Invert(newMat2, out invMat2);
-                            ite++;
-                            message = $"{ite}, by exsisting rnd             ";
-                        } while (ApplyNewMatrix(camera, invMat2, message) && ite < 10);
-
-                        //get from current matrix
-                        message = $"by new rnd             ";
-                        Matrix4x4 rndMat = Matrix4x4.Multiply(invMat, newRotd);
-                        while (ApplyNewMatrix(camera, rndMat, message)) {
-                            message = $"by repeating new rnd             ";
-                            rndMat = Matrix4x4.Multiply(invMat, newRotd);
-                        }
-                    }
-                    //sw.Stop();
-                    //Console.WriteLine(sw.Elapsed.TotalMilliseconds);
-                    //}
-                } else {
-                    if (!endedSearching) {
-                        endedSearching = true;
-                        Console.WriteLine("Ended Searching for matrices");
-                        if (refineSearch) {
-                            RefineSearch();
-                        }
-                        SaveMatrix();
-                        getRawTrackersStep = -1;
-                    }
-                }
+            RoomCalibrate.RevieveTrackers(index, camera, rot, pos, altRot);
             for (int i = 0; i < trackers.Length; i++) {
                 for (int j = 0; j < trackers[i].trackerIndex.Length; j++) {
                     if (trackers[i].trackerIndex[j] == index) {
@@ -685,158 +425,7 @@ namespace TagTracking {
             }
         }
 
-        private static void RefineSearch() {
-            if (cameras.Length < 2) {
-                Console.WriteLine("Not sufficient cameras to refine matrix");
-                return;
-            }
-            for (int c = 0; c < cameras.Length; c++) {
-                if (c == 1) continue;
-                Console.WriteLine($"Refining camera:{c} Matrix with {refineIterations} iterations");
-                Matrix4x4 trueMat = cameras[c].matrix;
-                float pdist = 0;
-                for (int k = 0; k < refineIterations; k++) {
-                    float[] vals = new float[] {trueMat.M11, trueMat.M12, trueMat.M13, trueMat.M14, trueMat.M21, trueMat.M22, trueMat.M23, trueMat.M24,
-                                trueMat.M31, trueMat.M32, trueMat.M33, trueMat.M34, trueMat.M41, trueMat.M42, trueMat.M43, trueMat.M44};
-                    float mult = (float)((((refineIterations - 1) * 1.25f) - k) / (float)((refineIterations - 1) * 1.25f));
-                    float span = 0.10f * mult;
-                    float step = 0.005f * mult;
-                    float mini = 0;
-                    float score = 1000f;
-                    Console.Write($"{k}, ({span:0.000}/{step:0.0000}) s: ");
-                    for (int j = 0; j < vals.Length; j++) {
-                        Console.Write(j + ", ");
-                        if (j == 3 || j == 7 || j >= 11) continue; //those dont move //3, 7, 11, 12, 13, 14, 15
-                        vals = new float[] {trueMat.M11, trueMat.M12, trueMat.M13, trueMat.M14, trueMat.M21, trueMat.M22, trueMat.M23, trueMat.M24,
-                                trueMat.M31, trueMat.M32, trueMat.M33, trueMat.M34, trueMat.M41, trueMat.M42, trueMat.M43, trueMat.M44};
-                        float save = vals[j];
-                        for (float i = -span; i <= span; i += step) {
-                            vals[j] = save + i;
-                            ApplyRefinedMatrix(vals, c);
-                            //SendTrackerOSC();
-                            //System.Threading.Thread.Sleep(100);
-                            float scr = GetDistanceFromEachTracker(c, cameras[c].matrix, 1);
-                            if (scr < score) {
-                                score = scr;
-                                mini = i;
-                            }
-                        }
-                        vals[j] = save + mini;
-                        ApplyRefinedMatrix(vals, c);
-                        trueMat = cameras[c].matrix;
-                        if (Program.debugSendTrackerOSC) {
-                            SendSingleTrackersOSC();
-                            System.Threading.Thread.Sleep(50);
-                        }
-                    }
-                    Console.WriteLine();
-                    float dist = GetDistanceFromEachTracker(c, cameras[c].matrix, 1);
-                    if (pdist == dist) {
-                        Console.WriteLine("Pretty close already");
-                        break;
-                    }
-                    pdist = dist;
-                    if (Program.debugSendTrackerOSC) {
-                        SendSingleTrackersOSC();
-                        System.Threading.Thread.Sleep(50);
-                    }
-                }
-            }
-        }
-
-        static void ApplyRefinedMatrix(float[] vals, int c) {
-            cameras[c].matrix = new Matrix4x4(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6], vals[7],
-                                            vals[8], vals[9], vals[10], vals[11], vals[12], vals[13], vals[14], vals[15]);
-            Matrix4x4[] cbt = combinedTrackers[0].Obtain();
-            Vector3 pos1 = cbt[c].Translation;
-            Vector3 pos2 = cbt[1].Translation;
-            Vector3 diff = pos2 - pos1;
-            cameras[c].matrix = new Matrix4x4(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6], vals[7],
-                vals[8], vals[9], vals[10], vals[11], vals[12] + diff.X, vals[13] + diff.Y, vals[14] + diff.Z, vals[15]);
-        }
-
-        private static bool ApplyNewMatrix(int camera, Matrix4x4 rndMat, string message, bool raw = false) {
-            float score = GetDistanceFromEachTracker(camera, rndMat);
-            float dist = score;
-            score += GetDistanceFromZero(camera, rndMat) * 0.25f;
-            if ((score < cameras[camera].minScore || raw) && !float.IsNaN(score)) {
-                cameras[camera].minScore = score;
-                cameras[camera].matrix = rndMat;
-                //Console.CursorTop--;
-                Console.WriteLine($"Updated matrix for cam {camera}: {dist} / {score} " + message);
-                return true;
-            }
-            return false;
-        }
-
-        private static float GetDistanceFromEachTracker(int camera, Matrix4x4 mat1, int against = -1) {
-            float distSum = 0;
-            float[] depthMul = new float[cameras.Length];
-            for (int i = 0; i < cameras.Length; i++)
-                depthMul[i] = 1f;
-            for (int i = 0; i < cameras.Length; i++)
-                depthMul[i] = cameras[i].depthMult;
-            for (int i = 0; i < combinedTrackers.Count; i++) {
-                CombinedTracker tracker = combinedTrackers[i];
-                float weight = 1f;
-                //for (int j = 0; j < tagToCalibrate.Length; j++) {
-                //    if (id == tagToCalibrate[j]) {
-                //        found = true;
-                //        weight = tagToCalibrateWeight[j];
-                //        break;
-                //    }
-                //}
-                //if (!found) continue;
-                if (tracker.singles.Length < 2) continue;
-                Vector3 pos1 = tracker.singles[camera].pos * depthMul[camera];
-                pos1 = Vector3.Transform(pos1, mat1);
-                for (int j = 0; j < cameras.Length; j++) {
-                    //TODO: this may be broken
-                    if (j == camera) continue;
-                    if (against != -1) {
-                        if (against != j) continue;
-                    }
-                    Vector3 pos2 = tracker.singles[j].pos * depthMul[j];
-                    pos2 = Vector3.Transform(pos2, cameras[j].matrix);
-                    float dist = Utils.GetDistance(pos1.X, pos1.Y, pos1.Z, pos2.X, pos2.Y, pos2.Z);
-                    dist *= weight;
-                    distSum += dist;
-                }
-            }
-            return distSum;
-        }
-        private static float GetDistanceFromZero(int camera, Matrix4x4 mat, bool modDepth = true) {
-            float distSum = 0;
-            float depthMul = 1f;
-            if (modDepth) {
-                depthMul = cameras[camera].depthMult;
-            }
-            Vector3 sum = new Vector3();
-            int count = 0;
-            for (int i = 0; i < combinedTrackers.Count; i++) {
-                CombinedTracker tracker = combinedTrackers[i];
-                //if (!(tracker.index == 0 || tracker.index == 2 || tracker.index == 4 || tracker.index == 6)) continue; //to not get garbage
-                bool found = false;
-                int id = tracker.index;
-                for (int j = 0; j < tagsOnFloor.Length; j++) {
-                    if (id == tagsOnFloor[j]) {
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) continue;
-                Vector3 pos1 = tracker.singles[camera].pos * depthMul;
-                pos1 = Vector3.Transform(pos1, mat);
-                sum += pos1;
-                count++;
-            }
-            float dist = Utils.GetDistance(sum.X, sum.Y, sum.Z, 0f, 0f, 0f);
-            distSum += dist;
-            //emphazises in floor level
-            dist = Math.Abs(sum.Z);
-            distSum += dist;
-            return distSum;
-        }
+        
 
         public static void GetTrackers() {
             if (finals == null) return;
