@@ -530,20 +530,6 @@ namespace TagTracking {
         }
 
         public static void SendTrackers() {
-            //for (int i = 0; i < trackers.Length; i++) {
-            //    Matrix4x4 mat = trackers[i].Obtain();
-            //    Vector4 headPos = Program.hmdList[0];
-            //    mat = Matrix4x4.Multiply(mat, Program.offsetMat);
-            //    mat.M41 -= (headPos.X - Program.hmdPos[0]) * trackers[i].trackerFollowWeight;
-            //    mat.M43 -= (headPos.Y - Program.hmdPos[1]) * trackers[i].trackerFollowWeight;
-            //    mat.M42 += (headPos.Z - Program.hmdPos[2]) * trackers[i].trackerFollowWeight;
-            //    Vector3 pos = mat.Translation;
-            //    Quaternion q = Quaternion.CreateFromRotationMatrix(mat);
-            //    Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
-            //                                pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
-            //                                -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
-            //}
-            //newInfo = false;
             float noiseRed = Program.postNoise == 2 ? 0.5f : 1f;
             for (int i = 0; i < finals.Length; i++) {
                 float score = 1f - finals[i].velScore;
@@ -557,20 +543,7 @@ namespace TagTracking {
                 if (Program.useInterpolation) {
                     Extrapolate.trackers[i].UpdatePos(pos, q, i);
                 } else {
-                    if (Program.useVRChatOSCTrackers) {
-                        Program.oscClient.Send($"/tracking/trackers/{i + 1}/position", pos.X, pos.Z, pos.Y);
-                        Vector3 e = Utils.ToEulerAngles(q);
-                        Program.oscClient.Send($"/tracking/trackers/{i + 1}/rotation", e.X, e.Z, e.Y);
-                    } else {
-                        Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
-                                                    pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
-                                                    -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
-                        if (Program.debugSendTrackerOSC) {
-                            Program.oscClientDebug.Send("/debug/final/position", i + 1,
-                                                   pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
-                                                   -q.X, -q.Z, -q.Y, q.W);
-                        }
-                    }
+                    SendTracker(i, pos, q);
                 }
             }
             if (!Program.useVRChatOSCTrackers) {
@@ -600,6 +573,23 @@ namespace TagTracking {
                     Program.oscClient.Send($"/tracking/trackers/head/position", headpos[0], headpos[1], -headpos[2]);
                 if (Program.sendHeadRotationVRC)
                     Program.oscClient.Send($"/tracking/trackers/head/rotation", -headrot[0] * m, -headrot[2] * m, headrot[1] * m);
+            }
+        }
+
+        public static void SendTracker(int i, Vector3 pos, Quaternion q) {
+            if (Program.useVRChatOSCTrackers) {
+                Program.oscClient.Send($"/tracking/trackers/{i + 1}/position", pos.X, pos.Z, pos.Y);
+                Vector3 e = Utils.ToEulerAngles(q);
+                Program.oscClient.Send($"/tracking/trackers/{i + 1}/rotation", e.X, e.Z, e.Y);
+            } else {
+                Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
+                                            pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
+                                            -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
+                if (Program.debugSendTrackerOSC) {
+                    Program.oscClientDebug.Send("/debug/final/position", i + 1,
+                                           pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
+                                           -q.X, -q.Z, -q.Y, q.W);
+                }
             }
         }
 

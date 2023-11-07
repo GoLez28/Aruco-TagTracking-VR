@@ -127,22 +127,7 @@ namespace TagTracking {
                     pos = preSmooth.Translation;
                     q = Quaternion.CreateFromRotationMatrix(preSmooth);
                     //Quaternion q = trackers[i].rotation;
-
-                    if (Program.useVRChatOSCTrackers) {
-                        //pos -= new Vector3(Program.hmdPos[0], Program.hmdPos[1], Program.hmdPos[2] );
-                        Program.oscClient.Send($"/tracking/trackers/{i + 1}/position", pos.X, pos.Z, pos.Y);
-                        Vector3 e = ToEulerAngles(q) * (114.591559f / 2f);
-                        Program.oscClient.Send($"/tracking/trackers/{i + 1}/rotation", -e.X, -e.Z, e.Y);
-                    } else {
-                        Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
-                                                            pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
-                                                            -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
-                        if (Program.debugSendTrackerOSC) {
-                            Program.oscClientDebug.Send("/debug/final/position", i + 1,
-                                                   pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
-                                                   -q.X, -q.Z, -q.Y, q.W);
-                        }
-                    }
+                    Tag.SendTracker(i, pos, q);
                 }
                 if (Program.useVRChatOSCTrackers) {
                     float[] headpos = Program.hmdPos;
