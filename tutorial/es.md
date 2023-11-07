@@ -1,11 +1,10 @@
 Primero, debo decir que mi programa no esta completo, si quieres una solucion mas refinada, moderna y facil de usar utiliza este proyecto https://github.com/ju1ce/April-Tag-VR-FullBody-Tracker,  
-pero solo utiliza una camara,  
-si vas a querer utilizar mi programa, vas a tener que descargar ese proyecto de todas formas, por tema de calibrar la camara
+pero solo utiliza una camara
 
 Empezando, debes instalar un driver para steamvr, que permitira que el tracker sea detectado por steamvr,  
 debes instalar VMT https://github.com/gpsnmeajp/VirtualMotionTracker/releases/tag/v0.15 , el instalador es bastante facil de usar,  
-una vez instalado no se necesita hacer nada mas (eso creo).
-Despues, vas a tener que descargar mi programa https://github.com/GoLez28/TagTracking/releases/tag/v0.4, cuando lo abras por primera vez, se generara el archivo "arucoboard.png" al lado del .exe,  
+una vez instalado no se necesita hacer nada mas (eso creo) (tambien puedas usar el tracking nativo de VRChat por OSC activando la opcion useVrchatOscTrackers=true, pero recomiendo VMT).
+Despues, vas a tener que descargar mi programa https://github.com/GoLez28/Aruco-TagTracking-VR/releases/latest, cuando lo abras por primera vez, se generara el archivo "arucotags.png" al lado del .exe,  
 <img src="https://raw.githubusercontent.com/GoLez28/TagTracking/master/tutorial/arucoboard.png" width="200">   
 esto es lo que vas a tener que imprimir, pero solo lo que necesites, por ejemplo si vas a usar 4 para el pie derecho, 4 para el izquierdo y 6 para la cintura,  
 necesitaras 14 en total, lo demas va a ser innecesario.
@@ -21,7 +20,11 @@ esta es la forma que tengo puesto los trackers
 pero tambien puedes colocarlos asi, o realmente de cualquier forma, entre mas grande, mejor es detectado, pero mas incomodo  
 <img src="https://raw.githubusercontent.com/GoLez28/TagTracking/master/tutorial/simple%20tracker.jpg" width="200">  
 pero te tienes que asegurar de que el segundo tag (el que esta a 1.57 radianes), sea el que este mirando hacia el frente,  
-puedes modificar la posicion y cantidad de los tags, en "trackers.txt", que ya deberia estar configurado, pero el de la citura posiblemente lo tengas que editar,  
+para calibrar el tracker con los tags puesto debes presionar '3' para iniciar la calibracion,  
+te preguntara que camara usar, el nombre del tracker, que id de los tags usar (ej:`0 1 2 3`), y que tag usar como referencia absoluta, si tienes duda de como se esta calibrando puedes revisarlo presionando '7' y presionar espacio en la ventana que aparecera para ir a la vista 'Tracker Calibration',  
+una vez calibrado se generara un archivo con el nombre que pusiste, el contenido lo tienes que pegar en 'trackers.txt',  
+
+tambien puedes modificar la posicion y cantidad de los tags, en "trackers.txt", que ya deberia estar configurado,  
 el archivo se muestra en este formato
 ```
 NOMBRE
@@ -44,22 +47,13 @@ si te fijas, en posZ esta puesto -0.055 como valor, esa es la profundidad que de
 como se muestra aqui, un profundidad de 55mm (0.055m)
 
 Para las camaras yo estoy utilizando celulares por la app iVCam (si quieres saber como configurarlo de la mejor forma, me preguntas),  
-pero primero hay que calibrar las camaras, para eso necesitamos el otro proyecto 'Juices VR Marker Tracking', por que ahi tiene una opcion para calibrar camaras,  
-al abrir esa aplicacion, te vas a la pestaña Params, y en 'ID of camera' colocas 0, abajo le das Save,  
-<img src="https://raw.githubusercontent.com/GoLez28/TagTracking/master/tutorial/juices%20camera%20config.png" width="200">  
-te ve vas a la pestaña de Camera, le das Start, y Preview, si en la camara no se ve nada, tienes que cambiar de camara, le das Stop y te vas a Params y pones otro numero en ID of camera y repites,  
-cuando el preview muestre la camara que quieres calibrar, en la pestaña de Camera, le das a Calibrate camera,  
-<img src="https://raw.githubusercontent.com/GoLez28/TagTracking/master/tutorial/calib camera gui.png" width="200">  
-en la carpeta dela app de calibracion, deberia haber una carpeta llamada 'images-to-print' con 'charuco_board.jpg',  
-se supone que deberias imprimir eso tambien pero simplemente lo pones en pantalla completa y funciona igual,  
-la camara lo pones de manera que se vea la imagen completa, y vas moviendo la camara en varias posiciones, hasta que encuentra que sea suficiente,  
-<img src="https://raw.githubusercontent.com/GoLez28/TagTracking/master/tutorial/camera%20calib.jpg" width="600">  
+pero primero hay que calibrar las camaras, para eso debes presionar '4' para empezar la calibracion de la camara,  
+te pedira que id de la camara usar (la id puesta en 'config.txt', poner 0 significa usar la primera camara de la configuracion),  
+siguiente te aparecera una ventana para poder ver que aparece, debes tener abierto la imagen 'charuco.png' que aparecio en la carpeta de la aplicacion,  
+la camara debe estar viendo la imagen completa desde diferentes puntos de vista (nunca tan exagerado) mientras que en la consola mostrara el error actual (entre menos mejor),  
+una vez terminado presionar '4' para finalizar, guardara un archivo .xml en la carpeta y te preguntara si lo quieres sobre escribir en 'config.txt'  
 
-Una vez hecho eso en la carpeta de la app de calibracion, deberia haber un archivo llamado 'calib.yaml' en la carpeta 'config',  
-copias los valores del archivo 'config.yaml' a 'cameraParameters1.xml' que esta en la carpeta de la aplicacion que vamos a usar,  
-hay que copiar de camMat a cameraMatrix, y de distCoeffs a dist_coeffs, fijate que xml no usa comas si no que espacios,  
-(si la camara cambia en tema de resolucion, o otra cosa, se debe hacer la calibracion de nuevo)  
-<img src="https://raw.githubusercontent.com/GoLez28/TagTracking/master/tutorial/calib vals.png" width="600">  
+<img src="https://raw.githubusercontent.com/GoLez28/TagTracking/master/tutorial/camera%20calib.jpg" width="400">  (imagen referencial, no es mi app xD)
 
 ahora toca configurar las camaras, en config.txt tienes que asegurarte de que cameraXFile sea el nombre del xml de calibracion (un xml para cada camara), seguido de la resolucion y ID (Index),  
 lo mismo para todas las camaras que vas a usar definido por totalCameras (entre mas camaras, resolucion, fps, mas CPU va a usar),  
@@ -85,7 +79,7 @@ cuando ya creas que son suficientes tags registrados, asegurate de que el tag nu
 eso calibrara las camaras, pero no la posicion de los trackers, si ves que los trackers se agitan / tiritan mucho, es posible que la calibracion no fue muy buena y tenga que hacerse de nuevo,  
 o de que la camara entrega un resultado muy ruidoso.  
 
-Una vez con las camara calibradas, parate derecho y presiona '5' para que haga una estimacion de donde deberian estar los trackers, si quedas insatifecho con los resultados (o sea siempre xD), puedes pretar '2' para mover el espacio, presionando la empuñadura derecha (o 'P') mueves la posicion, y presionando el gatillo derecho (o 'O') mueves la direccion del espacio. Tambien puedes usar el teclado para refinar la posiciones, 'Q','W','A','S','Z','X' para cambiar la posicion y 'E','R','D','F','C','V' para cambiar la rotacion, asegurate de que el cuadrado este "dentro" de tu pierna, (o donde se supone donde lo dejaste en 'trackers.txt').  
+Una vez con las camara calibradas, parate derecho y presiona '5' para que haga una estimacion de donde deberian estar los trackers, si quedas insatifecho con los resultados (o sea siempre xD), puedes pretar '2' para mover el espacio, presionando la empuñadura derecha (o 'P') mueves la posicion, y presionando el gatillo derecho (o 'O') mueves la direccion del espacio (empuñadura y gatillo solo funciona sin el dashboard abierto). Tambien puedes usar el teclado para refinar la posiciones, 'Q','W','A','S','Z','X' para cambiar la posicion y 'E','R','D','F','C','V' para cambiar la rotacion, asegurate de que el cuadrado este "dentro" de tu pierna, (o donde se supone donde lo dejaste en 'trackers.txt').  
 
 Felicitaciones, los trackers deberian estar funcionando.  
 
