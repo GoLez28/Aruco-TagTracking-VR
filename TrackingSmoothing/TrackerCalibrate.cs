@@ -319,7 +319,7 @@ namespace TagTracking {
                     Quaternion orgQuat = Quaternion.CreateFromRotationMatrix(trackerAvg[index]);
                     Matrix4x4 orgRot = Matrix4x4.CreateFromQuaternion(orgQuat);
 
-                    Vector3 eulerAngles = QuaternionToEulerAngles(Quaternion.Inverse(orgQuat));
+                    Vector3 eulerAngles = Utils.ToEulerAngles(Quaternion.Inverse(orgQuat));
 
                     float pitchRad = eulerAngles.Y;   // Ángulo de cabeceo (X)
                     float yawRad = eulerAngles.Z;     // Ángulo de guiñada (Y)
@@ -380,27 +380,6 @@ namespace TagTracking {
             Console.WriteLine($"File saved as '{fileName}', contents need to paste it in 'trackers.txt'");
 
             Program.oscClientDebug.Send("/debug/calibrate/clear", 0);
-        }
-
-        static Vector3 QuaternionToEulerAngles(Quaternion quaternion) {
-            // Normalizar el quaternion
-            quaternion = Quaternion.Normalize(quaternion);
-
-            // Extraer los componentes del quaternion
-            float w = quaternion.W;
-            float x = quaternion.X;
-            float y = quaternion.Y;
-            float z = quaternion.Z;
-
-            // Calcular los ángulos de Euler
-            float pitch = MathF.Atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y));
-            float yaw = MathF.Asin(2 * (w * y - z * x));
-            float roll = MathF.Atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z));
-
-            // Crear un vector de ángulos de Euler
-            Vector3 eulerAngles = new Vector3(pitch, yaw, roll);
-
-            return eulerAngles;
         }
     }
 }

@@ -118,23 +118,40 @@ namespace TagTracking {
                 extrapolateIdleLoopBenchmark.Stop();
                 System.Diagnostics.Stopwatch extrapolateIdleWorkBenchmark = new System.Diagnostics.Stopwatch();
                 extrapolateIdleWorkBenchmark.Start();
+                Program.GetDevices();
                 for (int i = 0; i < trackers.Length; i++) {
                     if (Program.debugShowCamerasPosition && Program.debugTrackerToBorrow == i) continue;
                     (Vector3 pos, Quaternion q) = trackers[i].GetEstimatedPosition();
                     Matrix4x4 preSmooth = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(q), Matrix4x4.CreateTranslation(pos));
-                    Program.GetDevices();
                     preSmooth = Tag.GetOffsetTracker(preSmooth, Tag.trackers[i].trackerFollowWeight, Tag.trackers[i].leftElbowtrackerFollowWeight, Tag.trackers[i].rightElbowtrackerFollowWeight);
                     pos = preSmooth.Translation;
                     q = Quaternion.CreateFromRotationMatrix(preSmooth);
                     //Quaternion q = trackers[i].rotation;
-                    Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
-                                                        pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
-                                                        -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
-                    if (Program.debugSendTrackerOSC) {
-                        Program.oscClientDebug.Send("/debug/final/position", i + 1,
-                                               pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
-                                               -q.X, -q.Z, -q.Y, q.W);
+
+                    if (Program.useVRChatOSCTrackers) {
+                        //pos -= new Vector3(Program.hmdPos[0], Program.hmdPos[1], Program.hmdPos[2] );
+                        Program.oscClient.Send($"/tracking/trackers/{i + 1}/position", pos.X, pos.Z, pos.Y);
+                        Vector3 e = ToEulerAngles(q) * (114.591559f / 2f);
+                        Program.oscClient.Send($"/tracking/trackers/{i + 1}/rotation", -e.X, -e.Z, e.Y);
+                    } else {
+                        Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
+                                                            pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
+                                                            -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
+                        if (Program.debugSendTrackerOSC) {
+                            Program.oscClientDebug.Send("/debug/final/position", i + 1,
+                                                   pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
+                                                   -q.X, -q.Z, -q.Y, q.W);
+                        }
                     }
+                }
+                if (Program.useVRChatOSCTrackers) {
+                    float[] headpos = Program.hmdPos;
+                    float[] headrot = Program.hmdRot;
+                    float m = 114.591559f / 2f;
+                    if (Program.sendHeadPositionVRC)
+                        Program.oscClient.Send($"/tracking/trackers/head/position", headpos[0], headpos[1], -headpos[2]);
+                    if (Program.sendHeadRotationVRC)
+                        Program.oscClient.Send($"/tracking/trackers/head/rotation", -headrot[0] * m, -headrot[2] * m, headrot[1] * m);
                 }
 
                 extrapolateIdleWorkBenchmark.Stop();
@@ -146,6 +163,47 @@ namespace TagTracking {
                 extrapolateIdleLoopBenchmark.Stop();
                 Program.threadsIdleTime[1] = extrapolateIdleLoopBenchmark.Elapsed.TotalMilliseconds;
             }
+        }
+        public static Vector3 ToEulerAngles(Quaternion q) {
+            // Normalizar el quaternion
+            q = Quaternion.Normalize(q);
+
+            // Extraer los componentes del quaternion
+            float w = q.W;
+            float x = q.X;
+            float y = q.Y;
+            float z = q.Z;
+
+            // Calcular los ángulos de Euler
+            float pitch = MathF.Atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y));
+            float yaw = MathF.Asin(2 * (w * y - z * x));
+            float roll = MathF.Atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z));
+
+            // Crear un vector de ángulos de Euler
+            Vector3 eulerAngles = new Vector3(pitch, yaw, roll);
+
+            return eulerAngles;
+            //Vector3 angles = new();
+
+            //// roll / x
+            //double sinr_cosp = 2 * (q.W * q.X + q.Y * q.Z);
+            //double cosr_cosp = 1 - 2 * (q.X * q.X + q.Y * q.Y);
+            //angles.X = (float)Math.Atan2(sinr_cosp, cosr_cosp);
+
+            //// pitch / y
+            //double sinp = 2 * (q.W * q.Y - q.Z * q.X);
+            //if (Math.Abs(sinp) >= 1) {
+            //    angles.Y = (float)Math.CopySign(Math.PI / 2, sinp);
+            //} else {
+            //    angles.Y = (float)Math.Asin(sinp);
+            //}
+
+            //// yaw / z
+            //double siny_cosp = 2 * (q.W * q.Z + q.X * q.Y);
+            //double cosy_cosp = 1 - 2 * (q.Y * q.Y + q.Z * q.Z);
+            //angles.Z = (float)Math.Atan2(siny_cosp, cosy_cosp);
+
+            //return angles;
         }
         //THIS IS A MADE UP EXTRAPOLATION METHOD, DO NOT COPY, IT IS BAD LOL
         public static Vector3 CurveExtra(Vector3[] points, float dist) {
@@ -188,9 +246,12 @@ namespace TagTracking {
             };
             float mag = GetMag(newPred[0], newPred[1], newPred[2]);
             float d = (pM * dist);
-            newPred[0] = points[2].X + ((newPred[0] / mag) * d);
-            newPred[1] = points[2].Y + ((newPred[1] / mag) * d);
-            newPred[2] = points[2].Z + ((newPred[2] / mag) * d);
+            if (newPred[0] == 0) newPred[0] = points[2].X;
+            else newPred[0] = points[2].X + ((newPred[0] / mag) * d);
+            if (newPred[1] == 0) newPred[1] = points[2].Y;
+            else newPred[1] = points[2].Y + ((newPred[1] / mag) * d);
+            if (newPred[2] == 0) newPred[2] = points[2].Z;
+            else newPred[2] = points[2].Z + ((newPred[2] / mag) * d);
             return new Vector3(newPred[0], newPred[1], newPred[2]);
         }
         static float GetMag(float x, float y, float z) {

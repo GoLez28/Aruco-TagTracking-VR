@@ -554,13 +554,13 @@ namespace TagTracking {
                 if (Program.debugShowCamerasPosition && Program.debugTrackerToBorrow == i) continue;
                 Vector3 pos = finals[i].fpos;
                 Quaternion q = finals[i].frot;
-                if (Program.useVRChatOSCTrackers) {
-                    Program.oscClient.Send($"/tracking/trackers/{i + 1}/position", pos.X, pos.Z, pos.Y);
-                    Vector3 e = ToEulerAngles(q);
-                    Program.oscClient.Send($"/tracking/trackers/{i + 1}/rotation", e.X, e.Z, e.Y);
+                if (Program.useInterpolation) {
+                    Extrapolate.trackers[i].UpdatePos(pos, q, i);
                 } else {
-                    if (Program.useInterpolation) {
-                        Extrapolate.trackers[i].UpdatePos(pos, q, i);
+                    if (Program.useVRChatOSCTrackers) {
+                        Program.oscClient.Send($"/tracking/trackers/{i + 1}/position", pos.X, pos.Z, pos.Y);
+                        Vector3 e = Utils.ToEulerAngles(q);
+                        Program.oscClient.Send($"/tracking/trackers/{i + 1}/rotation", e.X, e.Z, e.Y);
                     } else {
                         Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
                                                     pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
@@ -592,11 +592,14 @@ namespace TagTracking {
                 }
             }
             //i didnt implement vrcosc correctly bc it doesnt use the rotation and idk why
-            if (Program.useVRChatOSCTrackers && Program.sendHeadTracker) {
+            if (Program.useVRChatOSCTrackers && !Program.useInterpolation) {
                 float[] headpos = Program.hmdPos;
                 float[] headrot = Program.hmdRot;
-                Program.oscClient.Send($"/tracking/trackers/head/position", headpos[0], headpos[1], headpos[2]);
-                Program.oscClient.Send($"/tracking/trackers/head/rotation", headrot[0], headrot[1], headrot[2]);
+                float m = 114.591559f / 2f;
+                if (Program.sendHeadPositionVRC)
+                    Program.oscClient.Send($"/tracking/trackers/head/position", headpos[0], headpos[1], -headpos[2]);
+                if (Program.sendHeadRotationVRC)
+                    Program.oscClient.Send($"/tracking/trackers/head/rotation", -headrot[0] * m, -headrot[2] * m, headrot[1] * m);
             }
         }
 
@@ -758,28 +761,6 @@ namespace TagTracking {
                 roll = Math.Atan2(2.0 * (q.X * q.Y + q.W * q.Z), q.W * q.W + q.X * q.X - q.Y * q.Y - q.Z * q.Z);
             }
         }
-        public static Vector3 ToEulerAngles(Quaternion q) {
-            Vector3 angles = new();
 
-            // roll / x
-            double sinr_cosp = 2 * (q.W * q.X + q.Y * q.Z);
-            double cosr_cosp = 1 - 2 * (q.X * q.X + q.Y * q.Y);
-            angles.X = (float)Math.Atan2(sinr_cosp, cosr_cosp);
-
-            // pitch / y
-            double sinp = 2 * (q.W * q.Y - q.Z * q.X);
-            if (Math.Abs(sinp) >= 1) {
-                angles.Y = (float)Math.CopySign(Math.PI / 2, sinp);
-            } else {
-                angles.Y = (float)Math.Asin(sinp);
-            }
-
-            // yaw / z
-            double siny_cosp = 2 * (q.W * q.Z + q.X * q.Y);
-            double cosy_cosp = 1 - 2 * (q.Y * q.Y + q.Z * q.Z);
-            angles.Z = (float)Math.Atan2(siny_cosp, cosy_cosp);
-
-            return angles;
-        }
     }
 }

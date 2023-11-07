@@ -83,5 +83,25 @@ namespace TagTracking {
             float t4 = 1.0f - 2.0f * (sqx + sqy);
             roll = (float)Math.Atan2(t3, t4);
         }
+        public static Vector3 ToEulerAngles(Quaternion q) {
+            // Normalizar el quaternion
+            q = Quaternion.Normalize(q);
+
+            // Extraer los componentes del quaternion
+            float w = q.W;
+            float x = q.X;
+            float y = q.Y;
+            float z = q.Z;
+
+            // Calcular los ángulos de Euler
+            float pitch = MathF.Atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y));
+            float yaw = MathF.Asin(2 * (w * y - z * x));
+            float roll = MathF.Atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z));
+
+            // Crear un vector de ángulos de Euler
+            Vector3 eulerAngles = new Vector3(pitch, yaw, roll);
+
+            return eulerAngles;
+        }
     }
 }

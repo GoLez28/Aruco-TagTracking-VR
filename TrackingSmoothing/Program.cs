@@ -73,7 +73,8 @@ namespace TagTracking {
         static int oscPortOut = 39570;//39570;
         static int oscPortOutDebug = 15460;//15460
         public static bool useVRChatOSCTrackers = false;
-        public static bool sendHeadTracker = true;
+        public static bool sendHeadPositionVRC = true;
+        public static bool sendHeadRotationVRC = false;
         public static bool debugSendTrackerOSC = false;
         public static bool debugShowCamerasPosition = false;
         public static int debugTrackerToBorrow = 0;
@@ -326,7 +327,7 @@ namespace TagTracking {
             hmdPos[0] = hmdPosV3.X;
             hmdPos[1] = hmdPosV3.Y;
             hmdPos[2] = hmdPosV3.Z;
-            Vector3 hmdRotEuler = Tag.ToEulerAngles(Quaternion.CreateFromRotationMatrix(hmdCentered));
+            Vector3 hmdRotEuler = Utils.ToEulerAngles(Quaternion.CreateFromRotationMatrix(hmdCentered));
             hmdRot[0] = hmdRotEuler.X;
             hmdRot[1] = hmdRotEuler.Y;
             hmdRot[2] = hmdRotEuler.Z;
@@ -798,7 +799,8 @@ namespace TagTracking {
                 else if (split[0].Equals("oscAddress")) oscAddress = split[1];
                 else if (split[0].Equals("oscPort")) oscPortOut = int.Parse(split[1]);
                 else if (split[0].Equals("useVrchatOscTrackers")) useVRChatOSCTrackers = split[1].Equals("true");
-                else if (split[0].Equals("sendHeadTracker")) sendHeadTracker = split[1].Equals("true");
+                else if (split[0].Equals("sendHeadPositionVRC")) sendHeadPositionVRC = split[1].Equals("true");
+                else if (split[0].Equals("sendHeadRotationVRC")) sendHeadRotationVRC = split[1].Equals("true");
                 else if (split[0].Equals("roomOffsetX")) roomOffset.X = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("roomOffsetY")) roomOffset.Y = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("roomOffsetZ")) roomOffset.Z = float.Parse(split[1], any, invariantCulture);
