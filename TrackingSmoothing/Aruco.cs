@@ -122,25 +122,36 @@ namespace TagTracking {
             //ArucoParameters.PolygonalApproxAccuracyRate = 0.1;
 
             // Calibration done with https://docs.opencv.org/3.4.3/d7/d21/tutorial_interactive_calibration.html
-            cameraMatrix = new Mat[Tag.cameras.Length];
-            distortionMatrix = new Mat[Tag.cameras.Length];
+            GetCameraParameters();
+        }
+
+        public static void GetCameraParameters() {
+            Mat[] newCameraMatrix = new Mat[Tag.cameras.Length];
+            Mat[] newDistortionMatrix = new Mat[Tag.cameras.Length];
             for (int i = 0; i < Tag.cameras.Length; i++) {
-                cameraMatrix[i] = new Mat(new Size(3, 3), DepthType.Cv32F, 1);
-                distortionMatrix[i] = new Mat(1, 8, DepthType.Cv32F, 1);
+                newCameraMatrix[i] = new Mat(new Size(3, 3), DepthType.Cv32F, 1);
+                newDistortionMatrix[i] = new Mat(1, 8, DepthType.Cv32F, 1);
             }
             for (int c = 0; c < Tag.cameras.Length; c++) {
                 string cameraConfigurationFile = "cameraParameters" + (c + 1) + ".xml";
                 if (!Tag.cameras[c].file.Equals(""))
                     cameraConfigurationFile = Tag.cameras[c].file;
+                if (!System.IO.File.Exists(cameraConfigurationFile)) {
+                    Console.WriteLine("Configuration file " + cameraConfigurationFile + " does not exist!");
+                    return;
+                }
                 FileStorage fs = new FileStorage(cameraConfigurationFile, FileStorage.Mode.Read);
                 if (!fs.IsOpened) {
                     Console.WriteLine("Could not open configuration file " + cameraConfigurationFile);
                     return;
                 }
-                fs["cameraMatrix"].ReadMat(cameraMatrix[c]);
-                fs["dist_coeffs"].ReadMat(distortionMatrix[c]);
+                fs["cameraMatrix"].ReadMat(newCameraMatrix[c]);
+                fs["dist_coeffs"].ReadMat(newDistortionMatrix[c]);
             }
+            cameraMatrix = newCameraMatrix;
+            distortionMatrix = newDistortionMatrix;
         }
+
         static float smoothbenchmark = 0;
         public static void Update(int c) {
             int frameCount = 0;

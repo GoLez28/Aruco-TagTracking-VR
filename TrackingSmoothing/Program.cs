@@ -119,10 +119,7 @@ namespace TagTracking {
             threadsIdleTime = new double[2 + Tag.cameras.Length];
 
             //initialize OSC Sender
-            oscClient = new uOscClient();
-            oscClient.port = oscPortOut;
-            oscClient.address = oscAddress;
-            oscClient.StartClient();
+            StartOscClient();
             oscClientDebug = new uOscClient();
             oscClientDebug.port = oscPortOutDebug;
             oscClientDebug.address = oscAddress;
@@ -161,6 +158,18 @@ namespace TagTracking {
             }
 #endif
             while (true) previousTime = UpdateLoop(app, previousTime);
+        }
+
+        private static void StartOscClient() {
+            if (oscClient != null) {
+                if (oscClient.isRunning)
+                    oscClient.StopClient();
+            } else {
+                oscClient = new uOscClient();
+            }
+            oscClient.port = oscPortOut;
+            oscClient.address = oscAddress;
+            oscClient.StartClient();
         }
 
         private static double UpdateLoop(Application app, double previousTime) {
@@ -781,6 +790,8 @@ namespace TagTracking {
         static void ReadConfig() {
             if (!File.Exists("config.txt")) return;
             string[] lines = File.ReadAllLines("config.txt");
+            bool restartOSC = false;
+            bool reloadCameraParameters = false;
             for (int i = 0; i < lines.Length; i++) {
                 if (lines[i][0] == ';') continue;
                 string[] split = lines[i].Split("=");
@@ -797,8 +808,10 @@ namespace TagTracking {
                 else if (split[0].Equals("postNoiseReduction")) postNoise = int.Parse(split[1]);
                 else if (split[0].Equals("enableIgnoreNoisyRotation")) ignoreNoisyRotation = split[1].Equals("true");
                 else if (split[0].Equals("oscAddress")) oscAddress = split[1];
-                else if (split[0].Equals("oscPort")) oscPortOut = int.Parse(split[1]);
-                else if (split[0].Equals("useVrchatOscTrackers")) useVRChatOSCTrackers = split[1].Equals("true");
+                else if (split[0].Equals("oscPort")) {
+                    oscPortOut = int.Parse(split[1]);
+                    restartOSC = true;
+                } else if (split[0].Equals("useVrchatOscTrackers")) useVRChatOSCTrackers = split[1].Equals("true");
                 else if (split[0].Equals("sendHeadPositionVRC")) sendHeadPositionVRC = split[1].Equals("true");
                 else if (split[0].Equals("sendHeadRotationVRC")) sendHeadRotationVRC = split[1].Equals("true");
                 else if (split[0].Equals("roomOffsetX")) roomOffset.X = float.Parse(split[1], any, invariantCulture);
@@ -861,6 +874,8 @@ namespace TagTracking {
                         if (split[0].Equals($"camera{j}Quality")) {
                             Tag.cameras[j].quality = float.Parse(split[1], any, invariantCulture);
                         } else if (split[0].Equals($"camera{j}File")) {
+                            if (!Tag.cameras[j].file.Equals(split[1]))
+                                reloadCameraParameters = true;
                             Tag.cameras[j].file = split[1];
                         } else if (split[0].Equals($"camera{j}Width")) {
                             Tag.cameras[j].width = int.Parse(split[1]);
@@ -885,6 +900,10 @@ namespace TagTracking {
                 }
             }
             Tag.cameraTPS = new double[Tag.cameras.Length];
+            if (restartOSC)
+                StartOscClient();
+            if (reloadCameraParameters)
+                Aruco.GetCameraParameters();
         }
     }
 }

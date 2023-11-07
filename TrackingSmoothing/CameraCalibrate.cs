@@ -152,6 +152,8 @@ namespace TagTracking {
                     }
                 }
                 File.WriteAllLines("config.txt", lines);
+                Tag.cameras[cameraToUse].file = file;
+                Aruco.GetCameraParameters();
             }
             Console.WriteLine("\nFinishied Calibration!");
         }
