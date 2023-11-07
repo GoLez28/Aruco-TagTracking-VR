@@ -8,8 +8,6 @@ How to use:
 
 More in-depth tutorial here: (spanish) https://github.com/GoLez28/TagTracking/blob/master/tutorial/es.md  
 
-For now camera calibration is not supported, so use Ju1ces April Tags (https://github.com/ju1ce/April-Tag-VR-FullBody-Tracker) to calibrate camera, and copy the values from the yaml config file to the xmls in the app
-
 Camera position can be estimated by pressing [1] and then pressing [2] while moving arround to add to the list, the tag 0 must be visible when finishing calibration by pressing [1] as this will be the direction on steamvr (charuco board not supported yet), you can see the calibration in depth by pressing [7] to open the scene view window, pressing any key in it, will change what you see, being in "Raw trackers" let you see what the cameras see.   
 Size of the trackers must be specified on the 'config.txt' file (trackerSize=[number]). Then adjust the offset of the room using the right controller by pressing [2] to toggle
 
@@ -24,6 +22,8 @@ filterSmoothRot is how smooth it will turn
 filterSmoothPos is how smooth it will move
 
 example in the files
+
+all the variables that config has: https://github.com/GoLez28/Aruco-TagTracking-VR/blob/master/tutorial/config_en.md
 
 
 https://github.com/GoLez28/TagTracking/assets/15484340/968b5222-90e1-4f15-a05d-14d728cc2c7a
