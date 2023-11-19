@@ -34,12 +34,19 @@ namespace TagTracking {
             public int rsWidth = 0;
             public int rsHeight = 0;
             public int index = 0;
+            public string url = "";
             public bool useCustomDistortion = false;
             public bool newData = false;
             public float brightness = 1f;
             public int skipFrames = 0;
             public int skipFrameCount = 0;
             public float xRatio = 1f;
+            public bool canEnterInWaitMode = true;
+            public bool inWaitMode = false;
+            public long lastSeenMarkerTime = 0;
+            public int timeBeforeWaiting = 20000;
+            public int waitTimeUpdate = 500;
+            public long lastWaitCheck = 0;
             public float yRatio = 1f;
             public float[] customDist = new float[] {
                     1.075f, 1f, 1.075f,
@@ -207,7 +214,7 @@ namespace TagTracking {
                             string[] split2 = split[0].Split("=");
                             if (split2.Length != 2) continue;
 
-                            float val = 0;
+                            float val;
                             float.TryParse(split2[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out val);
                             if (split2[0].Equals("avgSmoothDistTrigger")) currentTracker.avgSmoothDistTrigger = val;
                             else if (split2[0].Equals("avgSmoothVal")) currentTracker.avgSmoothVal = val;
@@ -222,6 +229,7 @@ namespace TagTracking {
                             else if (split2[0].Equals("filterSmoothPerTrackerRot")) currentTracker.UpdatePerTrackerFilterRot(val);
                             else if (split2[0].Equals("filterSmoothPerTrackerDepth")) currentTracker.UpdatePerTrackerFilterDepth(val);
                             else if (split2[0].Equals("trackerFollowWeight")) currentTracker.trackerFollowWeight = val;
+                            else if (split2[0].Equals("trackerIdleTime")) currentTracker.trackerDisableMax = (long)val;
                             else if (split2[0].Equals("leftElbowtrackerFollowWeight"))
                                 currentTracker.leftElbowtrackerFollowWeight = val;
                             else if (split2[0].Equals("rightElbowtrackerFollowWeight"))
@@ -432,6 +440,9 @@ namespace TagTracking {
             Vector4 headPos = Program.hmdList[0];
             for (int i = 0; i < trackers.Length; i++) {
                 Matrix4x4 mat = trackers[i].Obtain();
+                if (!trackers[i].trackerNotSeen) {
+                    finals[i].lastTimeSeen = Program.timer.ElapsedMilliseconds;
+                }
                 finals[i].preMat = mat;
 
                 Vector3 pos = mat.Translation;
@@ -480,19 +491,14 @@ namespace TagTracking {
             for (int i = 0; i < trackers.Length; i++) {
                 finals[i].Update();
 
-                Matrix4x4 preSmooth = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(finals[i].frot), Matrix4x4.CreateTranslation(finals[i].fpos));
+                Matrix4x4 mat = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(finals[i].frot), Matrix4x4.CreateTranslation(finals[i].fpos));
+                Matrix4x4 preSmooth = mat;
                 if (!Program.useInterpolation)
                     preSmooth = GetOffsetTracker(preSmooth, trackers[i].trackerFollowWeight, trackers[i].leftElbowtrackerFollowWeight, trackers[i].rightElbowtrackerFollowWeight);
                 Vector3 pos = preSmooth.Translation;
                 Quaternion q = preSmooth.Rotation();
                 finals[i].fpos = pos;
                 finals[i].frot = q;
-
-
-                Matrix4x4 previewMat = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(finals[i].frot), Matrix4x4.CreateTranslation(finals[i].fpos));
-                Matrix4x4 inv;
-                Matrix4x4.Invert(Program.offsetMat, out inv);
-                Matrix4x4 mat = Matrix4x4.Multiply(previewMat, inv);
                 //mat.M41 += (headPos.X - Program.hmdPos[0]) * trackers[i].trackerFollowWeight;
                 //mat.M43 += (headPos.Y - Program.hmdPos[1]) * trackers[i].trackerFollowWeight;
                 //mat.M42 -= (headPos.Z - Program.hmdPos[2]) * trackers[i].trackerFollowWeight;
@@ -577,12 +583,13 @@ namespace TagTracking {
         }
 
         public static void SendTracker(int i, Vector3 pos, Quaternion q) {
+            bool disable = Program.timer.ElapsedMilliseconds - finals[i].lastTimeSeen > trackers[i].trackerDisableMax;
             if (Program.useVRChatOSCTrackers) {
                 Program.oscClient.Send($"/tracking/trackers/{i + 1}/position", pos.X, pos.Z, pos.Y);
                 Vector3 e = Utils.ToEulerAngles(q);
                 Program.oscClient.Send($"/tracking/trackers/{i + 1}/rotation", e.X, e.Z, e.Y);
             } else {
-                Program.oscClient.Send("/VMT/Room/Unity", i + 1, 1, 0f,
+                Program.oscClient.Send("/VMT/Room/Unity", i + 1, disable ? 0 : 1, 0f,
                                             pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
                                             -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24
                 if (Program.debugSendTrackerOSC) {
@@ -744,12 +751,6 @@ namespace TagTracking {
             //    Aruco.DrawAxis(mat);
             //}
             //System.Threading.Thread.Sleep(50);
-
-            static void GetYawPitchRoll(Quaternion q, out double yaw, out double pitch, out double roll) {
-                yaw = Math.Atan2(2.0 * (q.Y * q.Z + q.W * q.X), q.W * q.W - q.X * q.X - q.Y * q.Y + q.Z * q.Z);
-                pitch = Math.Asin(-2.0 * (q.X * q.Z - q.W * q.Y));
-                roll = Math.Atan2(2.0 * (q.X * q.Y + q.W * q.Z), q.W * q.W + q.X * q.X - q.Y * q.Y - q.Z * q.Z);
-            }
         }
 
     }

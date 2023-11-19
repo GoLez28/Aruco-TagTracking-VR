@@ -16,6 +16,7 @@ namespace TagTracking {
     class Program {
         public static bool sendRaw = false;
         public static bool legsFolded = false;
+        static int coreCount = 1;
 
         public static bool poseAdjust = true;
         public static string poseAdjustWaist = "waist";
@@ -99,6 +100,7 @@ namespace TagTracking {
 
             Console.WriteLine("Starting...");
             timer.Start();
+            coreCount = Environment.ProcessorCount / 2; //hehe
 
             //initialize ovr application
             Application app = null;
@@ -310,7 +312,16 @@ namespace TagTracking {
             threadsWorkTime[0] = mainThreadBenchmark.Elapsed.TotalMilliseconds;
             mainThreadBenchmark.Restart();
             //A mimir, wait for next frame (80fps)
-            System.Threading.Thread.Sleep(1000 / updateFPS);
+            bool ActiveCams = false;
+            for (int i = 0; i < Tag.cameras.Length; i++) {
+                if (!Tag.cameras[i].inWaitMode) {
+                    ActiveCams = true;
+                    break;
+                }
+            }
+            int sleepTime = 1000 / updateFPS;
+            if (!ActiveCams) sleepTime *= 4;
+            System.Threading.Thread.Sleep(sleepTime);
             mainThreadBenchmark.Stop();
             threadsIdleTime[0] = mainThreadBenchmark.Elapsed.TotalMilliseconds;
 
@@ -413,7 +424,10 @@ namespace TagTracking {
             Console.SetCursorPosition(0, ypos);
             for (int i = 0; i < Tag.cameraTPS.Length; i++) {
                 if (i != 0) Console.Write(" / ");
-                Console.Write($"Cam {i} TPS: {Tag.cameraTPS[i]:0.00}");
+                if (Tag.cameras[i].inWaitMode)
+                    Console.Write($"Cam {i} TPS: Idle ");
+                else
+                    Console.Write($"Cam {i} TPS: {Tag.cameraTPS[i]:0.00}");
             }
             int initX = Console.CursorLeft;
             int endX = (initX / 8 + 1) * 8;
@@ -432,15 +446,23 @@ namespace TagTracking {
                 Console.Write(" ");
             }
             if (showThreadsMS) {
+                double overallUsage = 0;
                 for (int i = 0; i < threadsWorkTime.Length; i++) {
                     Console.SetCursorPosition(0, ypos + 1 + i);
                     if (i == 0) Console.Write("main");
                     else if (i == 1) Console.Write("interpolate");
                     else Console.Write($"camera {i - 2}");
-                    Console.Write($": work {threadsWorkTime[i]:0.0000}ms / idle {threadsIdleTime[i]:0.0000}ms");
+                    double percent = ((threadsWorkTime[i] / threadsIdleTime[i]) * 100);
+                    overallUsage += percent / coreCount;
+                    Console.Write($": work {threadsWorkTime[i]:0.0000}ms / idle {threadsIdleTime[i]:0.0000}ms / {percent:0.0}% core usage / {(percent / coreCount):0.0}% CPU usage");
                     for (int j = Console.CursorLeft; j < Console.WindowWidth; j++) {
                         Console.Write(" ");
                     }
+                }
+                Console.SetCursorPosition(0, ypos + 1 + threadsWorkTime.Length);
+                Console.Write($"Total CPU Usage: {overallUsage:0.00}%");
+                for (int j = Console.CursorLeft; j < Console.WindowWidth; j++) {
+                    Console.Write(" ");
                 }
             }
             Console.SetCursorPosition(x, y);
@@ -539,44 +561,27 @@ namespace TagTracking {
                 ShowHint();
             } else if (key == ConsoleKey.D1) {
                 if (RoomCalibrate.getRawTrackersStep > -1) {
-                    if (RoomCalibrate.getRawTrackersStep != -2) {
-                        Tag.cameras[0].minScore = float.MaxValue;
-                        Tag.cameras[1].minScore = float.MaxValue;
-                        RoomCalibrate.endedSearching = false;
-                        RoomCalibrate.saveMatTime = timer.ElapsedMilliseconds;
-                        RoomCalibrate.getRawTrackersStep = -2;
-                        Console.WriteLine("Averaging...");
-                    }
+                    RoomCalibrate.Calibrate();
                 } else if (RoomCalibrate.getRawTrackersStep == -2) {
-                    RoomCalibrate.saveMatTime = -20000;
-                    Console.WriteLine("Stopped...");
+                    RoomCalibrate.Stop();
                 } else {
-                    RoomCalibrate.addNewRaw = false;
-                    RoomCalibrate.newTrackersReady = false;
-                    Tag.combinedTrackers = new();
-                    offsetMat.M41 = 0f;
-                    offsetMat.M43 = 0f;
-                    offsetMat.M42 = 0f;
-                    rotationY = 0;
-                    rotationZ = 0;
-                    rotationX = 0;
-                    ApplyOffset();
-                    RoomCalibrate.getRawTrackersStep = 0;
-                    RoomCalibrate.getSnapshot = false;
-                    RoomCalibrate.timedSnapshot = false;
-                    Console.WriteLine("Press [1] to start averaging, press [2] to add available trackers, press [3] to add automatically");
+                    RoomCalibrate.Init();
                 }
             } else if (key == ConsoleKey.D4) {
-                if (CameraCalibrate.onCalibration) {
-                    if (CameraCalibrate.startCalibrating) {
-                        if (CameraCalibrate.framesSaved == 0)
-                            CameraCalibrate.Cancel();
-                        else
-                            CameraCalibrate.StartCalibration();
-                    }
+                if (RoomCalibrate.getRawTrackersStep > -1 && false) {
+                    RoomCalibrate.AnchorDialog();
                 } else {
-                    Console.WriteLine($"Calibrate Camera");
-                    CameraCalibrate.Init();
+                    if (CameraCalibrate.onCalibration) {
+                        if (CameraCalibrate.startCalibrating) {
+                            if (CameraCalibrate.framesSaved == 0)
+                                CameraCalibrate.Cancel();
+                            else
+                                CameraCalibrate.StartCalibration();
+                        }
+                    } else {
+                        Console.WriteLine($"Calibrate Camera");
+                        CameraCalibrate.Init();
+                    }
                 }
             } else if (key == ConsoleKey.D2) {
                 if (RoomCalibrate.getRawTrackersStep > -1) {
@@ -613,6 +618,9 @@ namespace TagTracking {
                 performanceMode = !performanceMode;
                 Console.WriteLine($"Performance Mode: " + Show(performanceMode));
             } else if (key == ConsoleKey.G) {
+                Aruco.useDynamicFraming = !Aruco.useDynamicFraming;
+                Console.WriteLine($"Dynamic Framing: " + Show(Aruco.useDynamicFraming));
+            } else if (key == ConsoleKey.U) {
                 needsToSearchHands = true;
                 Console.WriteLine($"Searching hands");
             } else if (key == ConsoleKey.Q) {
@@ -728,27 +736,6 @@ namespace TagTracking {
             offsetMat.M41 = offsetMat.M41 + roomOffset.X;
             offsetMat.M42 = offsetMat.M42 + roomOffset.Y;
             offsetMat.M43 = offsetMat.M43 + roomOffset.Z;
-            //if (debugSendTrackerOSC) {
-            //    if (key == ConsoleKey.Z) {
-            //        Matrix4x4 newRot = Matrix4x4.CreateFromYawPitchRoll(0, 0, 0.01f);
-            //        Tag.cameras[0].matrix = Matrix4x4.Multiply(Tag.cameras[0].matrix, newRot);
-            //    } else if (key == ConsoleKey.X) {
-            //        Matrix4x4 newRot = Matrix4x4.CreateFromYawPitchRoll(0, 0, -0.01f);
-            //        Tag.cameras[0].matrix = Matrix4x4.Multiply(Tag.cameras[0].matrix, newRot);
-            //    } else if (key == ConsoleKey.A) {
-            //        Matrix4x4 newRot = Matrix4x4.CreateFromYawPitchRoll(0, 0.01f, 0);
-            //        Tag.cameras[0].matrix = Matrix4x4.Multiply(Tag.cameras[0].matrix, newRot);
-            //    } else if (key == ConsoleKey.S) {
-            //        Matrix4x4 newRot = Matrix4x4.CreateFromYawPitchRoll(0, -0.01f, 0);
-            //        Tag.cameras[0].matrix = Matrix4x4.Multiply(Tag.cameras[0].matrix, newRot);
-            //    } else if (key == ConsoleKey.Q) {
-            //        Matrix4x4 newRot = Matrix4x4.CreateFromYawPitchRoll(0.01f, 0, 0);
-            //        Tag.cameras[0].matrix = Matrix4x4.Multiply(Tag.cameras[0].matrix, newRot);
-            //    } else if (key == ConsoleKey.W) {
-            //        Matrix4x4 newRot = Matrix4x4.CreateFromYawPitchRoll(-0.01f, 0, 0);
-            //        Tag.cameras[0].matrix = Matrix4x4.Multiply(Tag.cameras[0].matrix, newRot);
-            //    }
-            //}
             Console.WriteLine();
             using (StreamWriter sw = new StreamWriter("offsets")) {
                 sw.WriteLine(rotationX);
@@ -764,7 +751,7 @@ namespace TagTracking {
             return b ? "Enabled" : "Disabled";
         }
 
-        private static void ApplyOffset() {
+        public static void ApplyOffset() {
             Matrix4x4 newMat = Matrix4x4.CreateFromYawPitchRoll(rotationZ, rotationX, rotationY);
             newMat.M41 = offsetMat.M41;
             newMat.M42 = offsetMat.M42;
@@ -823,15 +810,26 @@ namespace TagTracking {
                 else if (split[0].Equals("useInterpolation")) useInterpolation = split[1].Equals("true");
                 else if (split[0].Equals("seekAhead")) Extrapolate.extrapolationRatio = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("useSmoothCorners")) Aruco.useSmoothCorners = split[1].Equals("true");
-                else if (split[0].Equals("cornersMaxDistance")) Aruco.cornersMaxDistance = int.Parse(split[1]);
+                else if (split[0].Equals("cornersMaxDistance")) Aruco.cornersMaxDistance = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("cornersSmoothFactor")) Aruco.cornersSmoothFactor = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("refineSearch")) RoomCalibrate.refineSearch = split[1].Equals("true");
                 else if (split[0].Equals("showThreadsTime")) showThreadsMS = split[1].Equals("true");
                 else if (split[0].Equals("refineIterations")) RoomCalibrate.refineIterations = int.Parse(split[1]);
                 else if (split[0].Equals("dynamicFiltering")) Tag.dynamicFiltering = split[1].Equals("true");
+                else if (split[0].Equals("dynamicFraming")) Aruco.useDynamicFraming = split[1].Equals("true");
+                else if (split[0].Equals("markerDictionary")) Aruco.markerDictionary = split[1].ToLower();
                 else if (split[0].Equals("performanceUnderSample")) performanceUnderSample = float.Parse(split[1], any, invariantCulture);
-                else if (split[0].Equals("autoActivatePerformanceMode")) Program.autoActivatePerformanceMode = split[1].Equals("true");
-                else if (split[0].Equals("perTrackerSize")) {
+                else if (split[0].Equals("autoActivatePerformanceMode")) autoActivatePerformanceMode = split[1].Equals("true");
+                else if (split[0].Equals("refinementMethod")) {
+                    Aruco.refinementMethod = int.Parse(split[1]);
+                    Aruco.ApplyParams();
+                } else if (split[0].Equals("refinementMinAccuracy")) {
+                    Aruco.refinementMinAcc = float.Parse(split[1], any, invariantCulture);
+                    Aruco.ApplyParams();
+                } else if (split[0].Equals("refinementWindowSize")) {
+                    Aruco.refinementWinSize = int.Parse(split[1]);
+                    Aruco.ApplyParams();
+                } else if (split[0].Equals("perTrackerSize")) {
                     Aruco.perMarkerLength.Clear();
                     string[] split2 = split[1].Split(",");
                     for (int j = 0; j < split2.Length; j++) {
@@ -886,7 +884,13 @@ namespace TagTracking {
                         } else if (split[0].Equals($"camera{j}ResizeHeight")) {
                             Tag.cameras[j].rsHeight = int.Parse(split[1]);
                         } else if (split[0].Equals($"camera{j}Index")) {
-                            Tag.cameras[j].index = int.Parse(split[1]);
+                            Tag.cameras[j].url = "";
+                            Tag.cameras[j].index = 0;
+                            bool ok = int.TryParse(split[1], out int number);
+                            if (!ok)
+                                Tag.cameras[j].url = split[1];
+                            else
+                                Tag.cameras[j].index = number;
                         } else if (split[0].Equals($"camera{j}WorldResize")) {
                             Tag.cameras[j].depthMult = float.Parse(split[1], any, invariantCulture);
                         } else if (split[0].Equals($"camera{j}Brightness")) {
@@ -895,6 +899,12 @@ namespace TagTracking {
                             Tag.cameras[j].adjustCurrentDistortion = split[1].Equals("true");
                         } else if (split[0].Equals($"camera{j}FrameSkip")) {
                             Tag.cameras[j].skipFrames = int.Parse(split[1]);
+                        } else if (split[0].Equals($"camera{j}IdleWaitTime")) {
+                            Tag.cameras[j].timeBeforeWaiting = int.Parse(split[1]);
+                        } else if (split[0].Equals($"camera{j}IdleUpdateTime")) {
+                            Tag.cameras[j].waitTimeUpdate = int.Parse(split[1]);
+                        } else if (split[0].Equals($"camera{j}CanEnterIdleMode")) {
+                            Tag.cameras[j].canEnterInWaitMode = split[1].Equals("true");
                         }
                     }
                 }

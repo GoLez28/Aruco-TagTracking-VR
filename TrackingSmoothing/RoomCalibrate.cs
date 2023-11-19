@@ -19,68 +19,151 @@ namespace TagTracking {
         public static bool addNewRaw = false;
         public static long lastTimeGetRaw = 0;
         public static bool timedSnapshot = false;
+        public static bool useAnchor = false;
+        public static int cameraAnchor = 0;
+        public static Matrix4x4 cameraAnchorMat = Matrix4x4.Identity;
 
-        public static void GetCalibrationTags() {
-            if (getRawTrackersStep > -1) {
-                if (timedSnapshot) {
-                    if (Program.timer.ElapsedMilliseconds - lastTimeGetRaw > 3000) {
-                        addNewRaw = true;
-                        lastTimeGetRaw = Program.timer.ElapsedMilliseconds;
-                    }
+        public static void Init() {
+            addNewRaw = false;
+            newTrackersReady = false;
+            combinedTrackers = new();
+            getRawTrackersStep = 0;
+            getSnapshot = false;
+            timedSnapshot = false;
+            Console.WriteLine("Press [1] to start averaging, press [2] to add available trackers, press [3] to add automatically");
+        }
+        public static void Stop(bool wasCancel = true) {
+            saveMatTime = -20000;
+            if (wasCancel)
+                Console.WriteLine("Stopped...");
+            else {
+                if (!useAnchor)
+                    return;
+                //fuck this
+                Matrix4x4 resMat = cameras[cameraAnchor].matrix;
+                //Matrix4x4.Invert(Matrix4x4.Subtract(resMat, cameraAnchorMat), out Matrix4x4 sub);
+                Matrix4x4 sourceMatrix = resMat;
+                Matrix4x4 targetMatrix = cameraAnchorMat;
+                Vector3 sourceTranslation = sourceMatrix.Translation;
+                Vector3 targetTranslation = targetMatrix.Translation;
+                Matrix4x4 sourceRotation = Matrix4x4.CreateFromQuaternion(Quaternion.CreateFromRotationMatrix(sourceMatrix));
+
+                Matrix4x4 targetRotation = Matrix4x4.CreateFromQuaternion(Quaternion.CreateFromRotationMatrix(targetMatrix));
+                Vector3 translationDiff = targetTranslation - sourceTranslation;
+                Matrix4x4.Invert(sourceRotation, out Matrix4x4 srcInv);
+                Matrix4x4 rotationDiff = Matrix4x4.Multiply(targetRotation, srcInv);
+                Matrix4x4 alignedMatrix = Matrix4x4.Multiply(rotationDiff, Matrix4x4.CreateTranslation(translationDiff));
+
+                for (int i = 0; i < cameras.Length; i++) {
+                    Vector3 tr = Vector3.Transform(cameras[i].matrix.Translation, alignedMatrix);
+                    Matrix4x4 ro = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(Quaternion.CreateFromRotationMatrix(cameras[i].matrix)), rotationDiff);
+                    Matrix4x4 newm = Matrix4x4.Multiply(ro, Matrix4x4.CreateTranslation(tr));
+                    cameras[i].matrix = newm;
+                    Console.WriteLine("lol");
                 }
-                bool ready = false;
-                int addCount = 0;
-                List<string> trackersName = new();
-                List<int> trackerId = new();
-                for (int i = 0; i < trackers.Length; i++) {
-                    for (int j = 0; j < trackers[i].trackers.Length; j++) {
-                        CombinedTracker cbt = trackers[i].trackers[j];
-                        bool lessThan = true;
-                        for (int k = 0; k < cbt.updateCount.Length; k++) {
-                            if (cbt.updateCount[k] > 2) {
-                                lessThan = false;
-                                break;
-                            }
+            }
+        }
+        public static void Calibrate() {
+            if (getRawTrackersStep == -2) {
+                return;
+            }
+            if (useAnchor) {
+                cameraAnchorMat = cameras[cameraAnchor].matrix;
+            } else {
+                Program.offsetMat.M41 = 0f;
+                Program.offsetMat.M43 = 0f;
+                Program.offsetMat.M42 = 0f;
+                Program.rotationY = 0;
+                Program.rotationZ = 0;
+                Program.rotationX = 0;
+                Program.ApplyOffset();
+            }
+            cameras[0].minScore = float.MaxValue;
+            cameras[1].minScore = float.MaxValue;
+            endedSearching = false;
+            saveMatTime = Program.timer.ElapsedMilliseconds;
+            getRawTrackersStep = -2;
+            Console.WriteLine("Averaging...");
+        }
+        public static void AnchorDialog() {
+            Console.WriteLine("Which camera do you want to anchor");
+            string read = Console.ReadLine();
+            if (read.Equals("")) {
+                Console.WriteLine("Input not valid");
+                return;
+            }
+            int number;
+            bool ok = int.TryParse(read, out number);
+            if (!ok) {
+                Console.WriteLine("Input not valid");
+                return;
+            }
+            useAnchor = true;
+            cameraAnchor = number;
+            Console.WriteLine($"Camera {cameraAnchor} will be used as anchor");
+        }
+        public static void GetCalibrationTags() {
+            if (getRawTrackersStep <= -1) {
+                return;
+            }
+            if (timedSnapshot) {
+                if (Program.timer.ElapsedMilliseconds - lastTimeGetRaw > 3000) {
+                    addNewRaw = true;
+                    lastTimeGetRaw = Program.timer.ElapsedMilliseconds;
+                }
+            }
+            bool ready = false;
+            int addCount = 0;
+            List<string> trackersName = new();
+            List<int> trackerId = new();
+            for (int i = 0; i < trackers.Length; i++) {
+                for (int j = 0; j < trackers[i].trackers.Length; j++) {
+                    CombinedTracker cbt = trackers[i].trackers[j];
+                    bool lessThan = true;
+                    for (int k = 0; k < cbt.updateCount.Length; k++) {
+                        if (cbt.updateCount[k] > 2) {
+                            lessThan = false;
+                            break;
                         }
-                        if (lessThan) {
-                            ready = true;
-                        }
-                        if (lessThan && addNewRaw) {
-                            addCount++;
-                            CombinedTracker cbt2 = new CombinedTracker(cbt.index);
-                            //search for name and id
-                            for (int k = 0; k < trackers.Length; k++) {
-                                for (int l = 0; l < trackers[k].trackerIndex.Length; l++) {
-                                    if (trackers[k].trackerIndex[l] == cbt2.index) {
-                                        trackersName.Add(trackers[k].trackerName);
-                                        trackerId.Add(cbt2.index);
-                                        break;
-                                    }
+                    }
+                    if (lessThan) {
+                        ready = true;
+                    }
+                    if (lessThan && addNewRaw) {
+                        addCount++;
+                        CombinedTracker cbt2 = new CombinedTracker(cbt.index);
+                        //search for name and id
+                        for (int k = 0; k < trackers.Length; k++) {
+                            for (int l = 0; l < trackers[k].trackerIndex.Length; l++) {
+                                if (trackers[k].trackerIndex[l] == cbt2.index) {
+                                    trackersName.Add(trackers[k].trackerName);
+                                    trackerId.Add(cbt2.index);
+                                    break;
                                 }
                             }
-                            for (int k = 0; k < cbt.singles.Length; k++) {
-                                cbt2.Recieve(k, cbt.singles[k].pos, cbt.singles[k].rot, -1);
-                            }
-                            combinedTrackers.Add(cbt2);
                         }
+                        for (int k = 0; k < cbt.singles.Length; k++) {
+                            cbt2.Recieve(k, cbt.singles[k].pos, cbt.singles[k].rot, -1);
+                        }
+                        combinedTrackers.Add(cbt2);
                     }
                 }
-                if (addNewRaw && addCount > 0) {
-                    Console.WriteLine($"Added {addCount}, total: {combinedTrackers.Count}");
-                    for (int i = 0; i < trackersName.Count; i++) {
-                        Console.WriteLine($"\t{trackersName[i]}: {trackerId[i]}");
-                    }
-                }
-                addNewRaw = false;
-                if (ready && !newTrackersReady) {
-                    newTrackersReady = true;
-                    Console.WriteLine("Trackers OK");
-                } else if (!ready && newTrackersReady) {
-                    newTrackersReady = false;
-                    Console.WriteLine("Trackers Missing");
-                }
-                newTrackersReady = ready;
             }
+            if (addNewRaw && addCount > 0) {
+                Console.WriteLine($"Added {addCount}, total: {combinedTrackers.Count}");
+                for (int i = 0; i < trackersName.Count; i++) {
+                    Console.WriteLine($"\t{trackersName[i]}: {trackerId[i]}");
+                }
+            }
+            addNewRaw = false;
+            if (ready && !newTrackersReady) {
+                newTrackersReady = true;
+                Console.WriteLine("Trackers OK");
+            } else if (!ready && newTrackersReady) {
+                newTrackersReady = false;
+                Console.WriteLine("Trackers Missing");
+            }
+            newTrackersReady = ready;
         }
         public static void RevieveTrackers(int index, int camera, Matrix4x4 rot, Vector3 pos, int altRot) {
             if (index != 0)
@@ -134,9 +217,10 @@ namespace TagTracking {
                 if (!endedSearching) {
                     endedSearching = true;
                     Console.WriteLine("Ended Searching for matrices");
-                    if (refineSearch) {
+                    if (refineSearch && combinedTrackers.Count > 4) {
                         RefineSearch();
                     }
+                    Stop(false);
                     SaveMatrix();
                     getRawTrackersStep = -1;
                 }

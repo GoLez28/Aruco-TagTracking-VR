@@ -42,6 +42,8 @@ namespace TagTracking {
             public float smoothedRot = 5;
             public float smoothedPos = 2;
             public bool generatedByCalibration = false;
+            public bool trackerNotSeen = false;
+            public long trackerDisableMax = 30000; //30 seconds
             int ghost = 0; //cheap way to avoid all uppdateCount at 0 and crash
 
             public float rotationComparison = 0.95f;
@@ -129,6 +131,12 @@ namespace TagTracking {
                     if (updateCount[i] <= 1) {
                         actualAvailableTrackers++;
                     }
+                }
+                trackerNotSeen = false;
+                if (actualAvailableTrackers == 0) {
+                    Matrix4x4 resultZero = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(prevRot), Matrix4x4.CreateTranslation(prevPos));
+                    trackerNotSeen = true;
+                    return resultZero;
                 }
 
                 //GET CENTERED

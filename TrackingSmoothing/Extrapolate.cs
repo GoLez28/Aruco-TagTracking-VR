@@ -112,7 +112,7 @@ namespace TagTracking {
                     interruptFlag = false;
                 }
                 if (!Program.useInterpolation) {
-                    System.Threading.Thread.Sleep(1000);
+                    System.Threading.Thread.Sleep(2000);
                     continue;
                 }
                 extrapolateIdleLoopBenchmark.Stop();
@@ -143,7 +143,17 @@ namespace TagTracking {
                 Program.threadsWorkTime[1] = extrapolateIdleWorkBenchmark.Elapsed.TotalMilliseconds;
                 extrapolateIdleLoopBenchmark.Start();
 
-                System.Threading.Thread.Sleep(1000 / Program.interpolationTPS);
+
+                bool ActiveCams = false;
+                for (int i = 0; i < Tag.cameras.Length; i++) {
+                    if (!Tag.cameras[i].inWaitMode) {
+                        ActiveCams = true;
+                        break;
+                    }
+                }
+                int sleepTime = 1000 / Program.interpolationTPS;
+                if (!ActiveCams) sleepTime *= 4;
+                System.Threading.Thread.Sleep(sleepTime);
 
                 extrapolateIdleLoopBenchmark.Stop();
                 Program.threadsIdleTime[1] = extrapolateIdleLoopBenchmark.Elapsed.TotalMilliseconds;
