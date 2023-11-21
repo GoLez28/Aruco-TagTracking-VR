@@ -801,9 +801,6 @@ namespace TagTracking {
                 matReference = movetarget;
             }
 
-            Matrix4x4 preSmooth = Tag.GetOffsetTracker(matReference, 0, 0, 0);
-            Tag.SendTracker(3, preSmooth.Translation, Quaternion.CreateFromRotationMatrix(preSmooth));
-
             Matrix4x4 newMat = offsetMat;
             Matrix4x4 nearMat = Matrix4x4.Multiply(matReference, newMat);
             Matrix4x4.Invert(rot2, out Matrix4x4 invRot);
