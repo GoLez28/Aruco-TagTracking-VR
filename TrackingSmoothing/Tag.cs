@@ -167,6 +167,7 @@ namespace TagTracking {
         }
         public static void ReadMatrix() {
             for (int i = 0; i < cameras.Length; i++) {
+                cameras[i].matrix = Matrix4x4.Identity;
                 if (!File.Exists("camMat" + i)) continue;
                 string[] lines = File.ReadAllLines("camMat" + i);
                 int l = 0;
@@ -583,7 +584,9 @@ namespace TagTracking {
         }
 
         public static void SendTracker(int i, Vector3 pos, Quaternion q) {
-            bool disable = Program.timer.ElapsedMilliseconds - finals[i].lastTimeSeen > trackers[i].trackerDisableMax;
+            bool disable = false;
+            if (i < finals.Length)
+                disable = Program.timer.ElapsedMilliseconds - finals[i].lastTimeSeen > trackers[i].trackerDisableMax;
             if (Program.useVRChatOSCTrackers) {
                 Program.oscClient.Send($"/tracking/trackers/{i + 1}/position", pos.X, pos.Z, pos.Y);
                 Vector3 e = Utils.ToEulerAngles(q);
