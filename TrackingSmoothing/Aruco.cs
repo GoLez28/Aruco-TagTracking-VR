@@ -269,7 +269,6 @@ namespace TagTracking {
                 if (c >= capture.Length) {
                     Console.WriteLine("Wait... this is illegal");
                 }
-                System.Diagnostics.Debug.WriteLine(c);
                 arucoThreadWorkBenchmark.Stop();
                 arucoThreadIdleBenchmark.Start();
                 while (true) {
