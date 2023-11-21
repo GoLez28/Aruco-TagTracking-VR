@@ -43,9 +43,6 @@ namespace TagTracking {
             }
         }
         public static Vector3 roomOffset = Vector3.Zero;
-        public static float rotationX = 0;
-        public static float rotationY = 0;
-        public static float rotationZ = 0;
         public static List<Vector4> hmdList = new List<Vector4>();
         public static List<Vector4> leftList = new List<Vector4>();
         public static List<Vector4> rightList = new List<Vector4>();
@@ -53,6 +50,8 @@ namespace TagTracking {
         public static float trackerDelay = 300f;
         public static bool wantToShowFrame = false;
         public static bool adjustOffset = false;
+        public static bool useTag0AsRotationPoint = false;
+        public static long adjustOffsetTime = 0;
         public static bool autoOffset = false;
         public static bool cannotGetControllers = false;
         public static bool isMoveKeyPressed = false;
@@ -213,20 +212,34 @@ namespace TagTracking {
                     if (isRotateKeyPressed) rotateTrigger = true;
 
                     //i separate translate offset and rotate offset bc my brain hurts just thinking about matrices
-                    var m2 = devPos[2].mDeviceToAbsoluteTracking;
+                    var m2 = devPos[rightHandID].mDeviceToAbsoluteTracking;
+                    Matrix4x4 conMat = new Matrix4x4(m2.m0, m2.m4, m2.m8, 0, m2.m1, m2.m5, m2.m9, 0, m2.m2, m2.m6, m2.m10, 0, m2.m3, m2.m7, m2.m11, 1);
+                    Matrix4x4 prevMat = new Matrix4x4(prevCont.m0, prevCont.m4, prevCont.m8, 0, prevCont.m1, prevCont.m5, prevCont.m9, 0, prevCont.m2, prevCont.m6, prevCont.m10, 0, prevCont.m3, prevCont.m7, prevCont.m11, 1);
                     //Console.WriteLine($"{m2.m0:0.00},{m2.m1:0.00},{m2.m2:0.00},{m2.m3:0.00},{m2.m4:0.00},{m2.m5:0.00},{m2.m6:0.00},{m2.m7:0.00},{m2.m8:0.00},{m2.m9:0.00},{m2.m10:0.00},{m2.m11:0.00},");
-                    Matrix4x4 d = new();
-                    d.M41 = prevCont.m3 - m2.m3;
-                    d.M42 = prevCont.m7 - m2.m7;
-                    d.M43 = prevCont.m11 - m2.m11;
-                    d = Matrix4x4.Multiply(Matrix4x4.CreateFromYawPitchRoll(rotationZ, rotationX, rotationY), d);
+                    //d = Matrix4x4.Multiply(Matrix4x4.CreateFromYawPitchRoll(rotationZ, rotationX, rotationY), d);
                     if (moveTrigger) {
-                        offsetMat.M41 += -d.M41;
-                        offsetMat.M43 += -d.M42;
-                        offsetMat.M42 += d.M43;
-                    } else if (rotateTrigger) {
-                        rotationY += d.M41;
-                        ApplyOffset();
+                        ApplyOffset(Matrix4x4.CreateTranslation(prevMat.Translation), Matrix4x4.CreateTranslation(conMat.Translation));
+                    }
+                    if (rotateTrigger) {
+                        if (useTag0AsRotationPoint) {
+                            int nearId = 0;
+                            bool foundNearMat = false;
+                            for (int i = 0; i < Tag.trackers.Length; i++) {
+                                if (Tag.trackers[i].trackerNotSeen) continue;
+                                foundNearMat = true;
+                                nearId = i;
+                                break;
+                            }
+                            if (foundNearMat) {
+                                conMat.M41 = Tag.finals[nearId].pos.X;
+                                conMat.M42 = Tag.finals[nearId].pos.Y;
+                                conMat.M43 = Tag.finals[nearId].pos.Z;
+                            }
+                        }
+                        prevMat.M41 = conMat.M41;
+                        prevMat.M42 = conMat.M42;
+                        prevMat.M43 = conMat.M43;
+                        ApplyOffset(conMat, prevMat, !useTag0AsRotationPoint);
                     }
                     prevCont = m2;
                 }
@@ -528,9 +541,9 @@ namespace TagTracking {
 
             Quaternion asdd = Quaternion.CreateFromRotationMatrix(offsetMat);
             Utils.ToYawPitchRoll(asdd, out float newY, out float newX, out float newZ);
-            rotationY = newY;
-            rotationX = newX;
-            rotationZ = newZ;
+            //rotationY = newY;
+            //rotationX = newX;
+            //rotationZ = newZ;
             //Matrix4x4.Invert(diff, out offsetMat);
         }
 
@@ -542,7 +555,7 @@ namespace TagTracking {
             Console.WriteLine($"\n[D8] Reset Trackers (VMT)\n[Space] Show Hints\n[D1] Calibrate Camera Positions\n[D2] Manual Offset Adjust: {Show(adjustOffset)}\n[D4] Calibrate Cameras (Distortion): {Show(CameraCalibrate.onCalibration)}" +
                 $"\n[J] Reload Offsets\n[L] Reloaded Config/Trackers\n[D5] Auto Adjust Offsets\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}\n[D9] Show Camera Windows\n[D0] Clear Console" +
                 $"\n[M] Pre-Pose Noise Reduction: {(preNoise == 0 ? "Disabled" : preNoise == 1 ? "Enabled" : "Smooth rects off")}\n[N] Post-Pose Noise Reduction: {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}" +
-                $"\n[Q]-[W] X: {offset.X}\n[A]-[S] Y: {offset.Y}\n[Z]-[X] Z: {offset.Z}\n[E]-[R] Yaw: {rotationY}\n[D]-[F] xRot: {rotationX}\n[C]-[V] zRot: {rotationZ}");
+                $"\n[Q]-[W] X: {offset.X}\n[A]-[S] Y: {offset.Y}\n[Z]-[X] Z: {offset.Z}\n[E]-[R] Yaw: \n[D]-[F] xRot: \n[C]-[V] zRot: ");
             if (ovrNotFound) {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"OVR not initialized, Restart app");
@@ -592,8 +605,11 @@ namespace TagTracking {
                     isMoveKeyPressed = false;
                     isRotateKeyPressed = false;
                     Console.WriteLine($"Adjust offset by hand: " + Show(adjustOffset));
-                    if (adjustOffset)
-                        Console.WriteLine("Move offset with Grip, rotate with Trigger. Or press [P] to move and [O] to rotate instead");
+                    if (adjustOffset) {
+                        adjustOffsetTime = timer.ElapsedMilliseconds;
+                        useTag0AsRotationPoint = false;
+                        Console.WriteLine("Move offset with Grip, rotate with Trigger, Press [I] to use Tracker 0 as rotation point. Or press [P] to move and [O] to rotate instead");
+                    }
                 }
             } else if (key == ConsoleKey.D3) {
                 //if (CameraCalibrate.startCalibrating) {
@@ -624,47 +640,41 @@ namespace TagTracking {
                 needsToSearchHands = true;
                 Console.WriteLine($"Searching hands");
             } else if (key == ConsoleKey.Q) {
-                offsetMat.M41 -= 0.01f;
+                ApplyOffset(moveX: -0.01f);
                 Console.WriteLine($"Decreased X offset {offsetMat.M41}");
             } else if (key == ConsoleKey.W) {
-                offsetMat.M41 += 0.01f;
+                ApplyOffset(moveX: 0.01f);
                 Console.WriteLine($"Increased X offset {offsetMat.M41}");
             } else if (key == ConsoleKey.A) {
-                offsetMat.M43 -= 0.01f;
+                ApplyOffset(moveY: -0.01f);
                 Console.WriteLine($"Decreased Y offset {offsetMat.M43}");
             } else if (key == ConsoleKey.S) {
-                offsetMat.M43 += 0.01f;
+                ApplyOffset(moveY: 0.01f);
                 Console.WriteLine($"Increased Y offset {offsetMat.M43}");
             } else if (key == ConsoleKey.Z) {
-                offsetMat.M42 -= 0.01f;
+                ApplyOffset(moveZ: -0.01f);
                 Console.WriteLine($"Decreased Z offset {offsetMat.M42}");
             } else if (key == ConsoleKey.X) {
-                offsetMat.M42 += 0.01f;
+                ApplyOffset(moveZ: 0.01f);
                 Console.WriteLine($"Increased Z offset {offsetMat.M42}");
             } else if (key == ConsoleKey.E) {
-                rotationY -= 0.02f;
-                Console.WriteLine($"Decreased Yaw offset {rotationY}");
-                ApplyOffset();
+                Console.WriteLine($"Decreased Yaw offset");
+                ApplyOffset(moveYaw: -0.02f);
             } else if (key == ConsoleKey.R) {
-                rotationY += 0.02f;
-                Console.WriteLine($"Increased Yaw offset {rotationY}");
-                ApplyOffset();
+                Console.WriteLine($"Increased Yaw offset");
+                ApplyOffset(moveYaw: 0.02f);
             } else if (key == ConsoleKey.D) {
-                rotationX -= 0.02f;
-                Console.WriteLine($"Decreased xRot offset {rotationX}");
-                ApplyOffset();
+                Console.WriteLine($"Decreased Pitch offset");
+                ApplyOffset(movePitch: -0.02f);
             } else if (key == ConsoleKey.F) {
-                rotationX += 0.02f;
-                Console.WriteLine($"Increased xRot offset {rotationX}");
-                ApplyOffset();
+                Console.WriteLine($"Increased Pitch offset");
+                ApplyOffset(movePitch: 0.02f);
             } else if (key == ConsoleKey.C) {
-                rotationZ -= 0.02f;
-                Console.WriteLine($"Decreased zRot offset {rotationZ}");
-                ApplyOffset();
+                Console.WriteLine($"Decreased Roll offset");
+                ApplyOffset(moveRoll: -0.02f);
             } else if (key == ConsoleKey.V) {
-                rotationZ += 0.02f;
-                Console.WriteLine($"Increased zRot offset {rotationZ}");
-                ApplyOffset();
+                Console.WriteLine($"Increased Roll offset");
+                ApplyOffset(moveRoll: 0.02f);
             } else if (key == ConsoleKey.D9) {
                 wantToShowFrame = !wantToShowFrame;
                 if (!wantToShowFrame) wantToCloseWindows = true;
@@ -719,6 +729,11 @@ namespace TagTracking {
                     isRotateKeyPressed = !isRotateKeyPressed;
                     Console.WriteLine($"Rotate offset manually {Show(isRotateKeyPressed)}");
                 }
+            } else if (key == ConsoleKey.I) {
+                if (adjustOffset) {
+                    useTag0AsRotationPoint = !useTag0AsRotationPoint;
+                    Console.WriteLine($"Use Tag 0 as rotation point {Show(useTag0AsRotationPoint)}");
+                }
             } else if (key == ConsoleKey.M) {
                 preNoise++;
                 if (preNoise > 2) preNoise = 0;
@@ -738,40 +753,131 @@ namespace TagTracking {
             offsetMat.M43 = offsetMat.M43 + roomOffset.Z;
             Console.WriteLine();
             using (StreamWriter sw = new StreamWriter("offsets")) {
-                sw.WriteLine(rotationX);
-                sw.WriteLine(rotationY);
-                sw.WriteLine(rotationZ);
+                sw.WriteLine(offsetMat.M11);
+                sw.WriteLine(offsetMat.M12);
+                sw.WriteLine(offsetMat.M13);
+                sw.WriteLine(offsetMat.M14);
+                sw.WriteLine(offsetMat.M21);
+                sw.WriteLine(offsetMat.M22);
+                sw.WriteLine(offsetMat.M23);
+                sw.WriteLine(offsetMat.M24);
+                sw.WriteLine(offsetMat.M31);
+                sw.WriteLine(offsetMat.M32);
+                sw.WriteLine(offsetMat.M33);
+                sw.WriteLine(offsetMat.M34);
                 sw.WriteLine(offsetMat.M41);
                 sw.WriteLine(offsetMat.M42);
                 sw.WriteLine(offsetMat.M43);
+                sw.WriteLine(offsetMat.M44);
             }
         }
 
         private static string Show(bool b) {
             return b ? "Enabled" : "Disabled";
         }
+        public static void ApplyOffset(Matrix4x4 moveOrigin, Matrix4x4 movetarget, bool adjustSteamVRMatrix = true) {
+            if (adjustSteamVRMatrix) {
+                float tmp = moveOrigin.M42;
+                moveOrigin.M42 = -moveOrigin.M43;
+                moveOrigin.M43 = tmp;
+                tmp = movetarget.M42;
+                movetarget.M42 = -movetarget.M43;
+                movetarget.M43 = tmp;
+            }
 
-        public static void ApplyOffset() {
-            Matrix4x4 newMat = Matrix4x4.CreateFromYawPitchRoll(rotationZ, rotationX, rotationY);
-            newMat.M41 = offsetMat.M41;
-            newMat.M42 = offsetMat.M42;
-            newMat.M43 = offsetMat.M43;
+            Quaternion q1 = Quaternion.CreateFromRotationMatrix(moveOrigin);
+            Quaternion q2 = Quaternion.CreateFromRotationMatrix(movetarget);
+            q1 = new Quaternion(-q1.X, q1.Z, -q1.Y, -q1.W);
+            q2 = new Quaternion(-q2.X, q2.Z, -q2.Y, -q2.W);
+            Matrix4x4 rot1 = Matrix4x4.CreateFromQuaternion(q1);
+            Matrix4x4 rot2 = Matrix4x4.CreateFromQuaternion(q2);
+
+            Matrix4x4 matReference;
+            if (adjustSteamVRMatrix) {
+                Matrix4x4 newOffsetMat = offsetMat;
+                Matrix4x4 invOffset = Utils.MatrixInvert(newOffsetMat);
+                matReference = Matrix4x4.Multiply(movetarget, invOffset);
+            } else {
+                matReference = movetarget;
+            }
+
+            Matrix4x4 preSmooth = Tag.GetOffsetTracker(matReference, 0, 0, 0);
+            Tag.SendTracker(3, preSmooth.Translation, Quaternion.CreateFromRotationMatrix(preSmooth));
+
+            Matrix4x4 newMat = offsetMat;
+            Matrix4x4 nearMat = Matrix4x4.Multiply(matReference, newMat);
+            Matrix4x4.Invert(rot2, out Matrix4x4 invRot);
+            Matrix4x4 rotMat = Matrix4x4.Multiply(rot1, invRot);
+            newMat = Matrix4x4.Multiply(newMat, invRot);
+            newMat = Matrix4x4.Multiply(newMat, rotMat);
+            newMat = Matrix4x4.Multiply(newMat, rot2);
+            Matrix4x4 nearMatNew = Matrix4x4.Multiply(matReference, newMat);
+
+            Vector3 offPos = nearMatNew.Translation - nearMat.Translation;
+            newMat.M41 -= offPos.X;
+            newMat.M42 -= offPos.Y;
+            newMat.M43 -= offPos.Z;
+
+            Vector3 movePos = moveOrigin.Translation - movetarget.Translation;
+            newMat.M41 -= movePos.X;
+            newMat.M42 -= movePos.Y;
+            newMat.M43 -= movePos.Z;
+
+            offsetMat = newMat;
+        }
+        public static void ApplyOffset(float moveX = 0f, float moveY = 0f, float moveZ = 0f, float moveYaw = 0f, float movePitch = 0f, float moveRoll = 0f) {
+            Matrix4x4 newMat = offsetMat;
+            Matrix4x4 matReference = Matrix4x4.Identity;
+            int nearId = 0;
+            bool foundNearMat = false;
+            for (int i = 0; i < Tag.trackers.Length; i++) {
+                if (Tag.trackers[i].trackerNotSeen) continue;
+                foundNearMat = true;
+                nearId = i;
+                break;
+            }
+            if (foundNearMat)
+                matReference = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(Tag.finals[nearId].frot), Matrix4x4.CreateTranslation(Tag.finals[nearId].fpos));
+
+            Matrix4x4 nearMat = Matrix4x4.Multiply(matReference, newMat);
+            if (movePitch != 0f) newMat = Matrix4x4.Multiply(newMat, Matrix4x4.CreateFromAxisAngle(new Vector3(1, 0, 0), movePitch));
+            if (moveRoll != 0f) newMat = Matrix4x4.Multiply(newMat, Matrix4x4.CreateFromAxisAngle(new Vector3(0, 1, 0), moveRoll));
+            if (moveYaw != 0f) newMat = Matrix4x4.Multiply(newMat, Matrix4x4.CreateFromAxisAngle(new Vector3(0, 0, 1), moveYaw));
+
+            Matrix4x4 nearMatNew = Matrix4x4.Multiply(matReference, newMat);
+            Vector3 offPos = nearMatNew.Translation - nearMat.Translation;
+            newMat.M41 -= offPos.X;
+            newMat.M42 -= offPos.Y;
+            newMat.M43 -= offPos.Z;
+
+            if (moveX != 0f) newMat.M41 += moveX;
+            if (moveY != 0f) newMat.M42 += moveY;
+            if (moveZ != 0f) newMat.M43 += moveZ;
             offsetMat = newMat;
         }
 
         static void LoadOffsets() {
             Tag.ReadMatrix();
+            offsetMat = Matrix4x4.Identity;
             if (File.Exists("offsets")) {
                 string[] lines = File.ReadAllLines("offsets");
                 int l = 0;
-                rotationX = float.Parse(lines[l++]);
-                rotationY = float.Parse(lines[l++]);
-                rotationZ = float.Parse(lines[l++]);
-                Matrix4x4 newMat = Matrix4x4.CreateFromYawPitchRoll(rotationZ, rotationX, rotationY);
-                newMat.M41 = float.Parse(lines[l++]);
-                newMat.M42 = float.Parse(lines[l++]);
-                newMat.M43 = float.Parse(lines[l++]);
-                offsetMat = newMat;
+                offsetMat.M11 = float.Parse(lines[l++]);
+                offsetMat.M12 = float.Parse(lines[l++]);
+                offsetMat.M13 = float.Parse(lines[l++]);
+                offsetMat.M14 = float.Parse(lines[l++]);
+                offsetMat.M21 = float.Parse(lines[l++]);
+                offsetMat.M22 = float.Parse(lines[l++]);
+                offsetMat.M23 = float.Parse(lines[l++]);
+                offsetMat.M24 = float.Parse(lines[l++]);
+                offsetMat.M31 = float.Parse(lines[l++]);
+                offsetMat.M32 = float.Parse(lines[l++]);
+                offsetMat.M33 = float.Parse(lines[l++]);
+                offsetMat.M34 = float.Parse(lines[l++]);
+                offsetMat.M41 = float.Parse(lines[l++]);
+                offsetMat.M42 = float.Parse(lines[l++]);
+                offsetMat.M43 = float.Parse(lines[l++]);
+                offsetMat.M44 = float.Parse(lines[l++]);
             }
         }
         static void ReadConfig() {

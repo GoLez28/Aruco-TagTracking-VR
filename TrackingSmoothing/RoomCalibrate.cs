@@ -70,12 +70,7 @@ namespace TagTracking {
             if (useAnchor) {
                 cameraAnchorMat = cameras[cameraAnchor].matrix;
             } else {
-                Program.offsetMat.M41 = 0f;
-                Program.offsetMat.M43 = 0f;
-                Program.offsetMat.M42 = 0f;
-                Program.rotationY = 0;
-                Program.rotationZ = 0;
-                Program.rotationX = 0;
+                Program.offsetMat = Matrix4x4.Identity;
                 Program.ApplyOffset();
             }
             cameras[0].minScore = float.MaxValue;

@@ -103,5 +103,9 @@ namespace TagTracking {
 
             return eulerAngles;
         }
+        public static Matrix4x4 MatrixInvert (Matrix4x4 mat) {
+            Matrix4x4.Invert(mat, out Matrix4x4 inv);
+            return inv;
+        }
     }
 }
