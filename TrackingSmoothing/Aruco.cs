@@ -260,7 +260,8 @@ namespace TagTracking {
                 System.Diagnostics.Stopwatch arucoThreadIdleBenchmark = new System.Diagnostics.Stopwatch();
                 arucoThreadWorkBenchmark.Start();
                 if (Program.wantToCloseWindows) {
-                    CvInvoke.DestroyAllWindows();
+                    CvInvoke.DestroyWindow($"Image{c}");
+                    System.Threading.Thread.Sleep(1000);
                     Program.wantToCloseWindows = false;
                 }
                 bool shouldShowFrame = Program.wantToShowFrame;
@@ -359,7 +360,7 @@ namespace TagTracking {
                     VectorOfVectorOfPointF rejected = new VectorOfVectorOfPointF(); // rejected contours
 
                     bool halfFrame = useDynamicFraming && frameCount % 6 != 0;
-                    halfFrame |= TrackerCalibrate.startCalibrating || CameraCalibrate.startCalibrating || RoomCalibrate.getRawTrackersStep > -1;
+                    halfFrame &= !(TrackerCalibrate.startCalibrating || CameraCalibrate.startCalibrating || RoomCalibrate.getRawTrackersStep > -1);
                     halfFrame &= !Tag.cameras[c].inWaitMode;
                     if (!halfFrame) {
                         ArucoInvoke.DetectMarkers(frame, ArucoDict, corners, ids, ArucoParameters, rejected);
