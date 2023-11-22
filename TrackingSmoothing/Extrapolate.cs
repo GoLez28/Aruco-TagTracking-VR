@@ -31,12 +31,6 @@ namespace TagTracking {
                 posList.Add(pos);
                 rotList.Add(rot);
                 lastTimeNewPos = Program.timer.Elapsed.TotalMilliseconds;
-                while (posList.Count() > 5) {
-                    posList.RemoveAt(0);
-                }
-                while (rotList.Count() > 5) {
-                    rotList.RemoveAt(0);
-                }
             }
             public Vector3 GetLastPosition() {
                 if (posList.Count() == 0)
@@ -51,6 +45,12 @@ namespace TagTracking {
                 return last;
             }
             public (Vector3, Quaternion) GetEstimatedPosition() {
+                while (posList.Count > 5) {
+                    posList.RemoveAt(0);
+                }
+                while (rotList.Count > 5) {
+                    rotList.RemoveAt(0);
+                }
                 if (posList.Count() < 3) {
                     if (posList.Count() == 0)
                         return (new Vector3(), Quaternion.Identity);
