@@ -136,8 +136,17 @@ void draw() {
       if (t.tick > 2) continue;
       fill((i*80)%255, 255, 255);
       pushMatrix();
+      //double[] rot = quaternionToEulerAngles(t.quat[0], t.quat[1], t.quat[2], t.quat[3]);
+      double[] mat = quatToMatrix(t.quat);
       translate(t.pos.x*100, t.pos.y*100, t.pos.z*100);
+      applyMatrix(
+        (float)mat[0], (float)mat[1], (float)mat[2], 0f,
+        (float)mat[3], (float)mat[4], (float)mat[5], 0f,
+        (float)mat[6], (float)mat[7], (float)mat[8], 0f,
+        0f, 0f, 0f, 1f);
       box(boxSize);
+      translate(-boxSize/2, boxSize/4, 0);
+      box(boxSize/5, boxSize/2, boxSize/5);
       popMatrix();
     }
     colorMode(RGB);
@@ -145,7 +154,7 @@ void draw() {
     colorMode(HSB);
     for (int i = 0; i < calibrateQuads.size(); i++) {
       Tracker t = calibrateQuads.get(i);
-        fill(255, 120, 255, 200);
+      fill(255, 120, 255, 200);
       pushMatrix();
       translate(t.pos.x*100, t.pos.y*100, t.pos.z*100);
       box(boxSize);
@@ -232,7 +241,11 @@ void oscEvent(OscMessage theOscMessage) {
     float x = theOscMessage.get(1).floatValue();
     float z = theOscMessage.get(2).floatValue();
     float y = theOscMessage.get(3).floatValue();
-    finalt[i] = new Tracker(new PVector(-x, y, z));
+    float q1 = theOscMessage.get(4).floatValue();
+    float q2 = theOscMessage.get(5).floatValue();
+    float q3 = theOscMessage.get(6).floatValue();
+    float q4 = theOscMessage.get(7).floatValue();
+    finalt[i] = new Tracker(new PVector(-x, y, z), new double[]{-q1, q3, q2, q4});
   } else if (theOscMessage.addrPattern().equals("/debug/calibrate/position")) {
     int i = theOscMessage.get(0).intValue() - 1;
     int t = theOscMessage.get(1).intValue();
@@ -244,8 +257,35 @@ void oscEvent(OscMessage theOscMessage) {
     else
       calibrate[i] = new Tracker(new PVector(-x, y, z), t);
   } else if (theOscMessage.addrPattern().equals("/debug/calibrate/clear")) {
-      calibrateQuads.clear();
+    calibrateQuads.clear();
   }
+}
+public final double[] quatToMatrix(double[] q) {
+  double sqw = q[3]*q[3];
+  double sqx = q[0]*q[0];
+  double sqy = q[1]*q[1];
+  double sqz = q[2]*q[2];
+
+  // invs (inverse square length) is only required if quaternion is not already normalised
+  double invs = 1 / (sqx + sqy + sqz + sqw);
+  double m00 = ( sqx - sqy - sqz + sqw)*invs ; // since sqw + sqx + sqy + sqz =1/invs*invs
+  double m11 = (-sqx + sqy - sqz + sqw)*invs ;
+  double m22 = (-sqx - sqy + sqz + sqw)*invs ;
+
+  double tmp1 = q[0]*q[1];
+  double tmp2 = q[2]*q[3];
+  double m10 = 2.0 * (tmp1 + tmp2)*invs ;
+  double m01 = 2.0 * (tmp1 - tmp2)*invs ;
+
+  tmp1 = q[0]*q[2];
+  tmp2 = q[1]*q[3];
+  double  m20 = 2.0 * (tmp1 - tmp2)*invs ;
+  double  m02 = 2.0 * (tmp1 + tmp2)*invs ;
+  tmp1 = q[1]*q[2];
+  tmp2 = q[0]*q[3];
+  double  m21 = 2.0 * (tmp1 + tmp2)*invs ;
+  double  m12 = 2.0 * (tmp1 - tmp2)*invs ;
+  return new double[]{m00, m01, m02, m10, m11, m12, m20, m21, m22};
 }
 Tracker[] finalt;
 Tracker[] adjust;
@@ -257,8 +297,13 @@ class Tracker {
   public PVector pos;
   public int tick = 0;
   public int type = 0;
+  public double[] quat = new double[4];
   public Tracker(PVector p) {
     pos = p;
+  }
+  public Tracker(PVector p, double[] q) {
+    pos = p;
+    quat = q;
   }
   public Tracker(PVector p, int t) {
     pos = p;
