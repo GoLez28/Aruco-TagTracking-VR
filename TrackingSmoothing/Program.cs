@@ -552,10 +552,11 @@ namespace TagTracking {
                 for (int i = 0; i < threadsWorkTime.Length; i++) {
                     Console.WriteLine();
                 }
-            Console.WriteLine($"\n[D8] Reset Trackers (VMT)\n[Space] Show Hints\n[D1] Calibrate Camera Positions\n[D2] Manual Offset Adjust: {Show(adjustOffset)}\n[D4] Calibrate Cameras (Distortion): {Show(CameraCalibrate.onCalibration)}" +
-                $"\n[J] Reload Offsets\n[L] Reloaded Config/Trackers\n[D5] Auto Adjust Offsets\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}\n[D9] Show Camera Windows\n[D0] Clear Console" +
-                $"\n[M] Pre-Pose Noise Reduction: {(preNoise == 0 ? "Disabled" : preNoise == 1 ? "Enabled" : "Smooth rects off")}\n[N] Post-Pose Noise Reduction: {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}" +
-                $"\n[Q]-[W] X: {offset.X}\n[A]-[S] Y: {offset.Y}\n[Z]-[X] Z: {offset.Z}\n[E]-[R] Yaw: \n[D]-[F] xRot: \n[C]-[V] zRot: ");
+            Console.WriteLine($"\n[Space] Show Hints\n[D1] Calibrate Camera Room Positions\n[D2] Manual Offset Adjust: {Show(adjustOffset)}\n[D3] Calibrate Trackers: {Show(TrackerCalibrate.onCalibration)}\n[D4] Calibrate Cameras (Distortion): {Show(CameraCalibrate.onCalibration)}\n[D5] Auto Adjust Offsets" +
+                $"\n[J] Reload Offsets\n[L] Reloaded Config/Trackers\n[D6] Show Cameras as Tracker 0: {Show(debugShowCamerasPosition)}\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}\n[D8] Reset Trackers (VMT)\n[D9] Show Camera Windows\n[D0] Clear Console" +
+                $"\n[M] Pre-Pose Noise Reduction: {(preNoise == 0 ? "Disabled" : preNoise == 1 ? "Enabled" : "Smooth rects off")}\n[N] Post-Pose Noise Reduction: {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}\n[B] Tracker Center Guessing: {(clusterRotationGuess == 0 ? "Disabled" : clusterRotationGuess == 1 ? "Enabled" : "CPU Heavy")}" +
+                $"\n[H] Enable Performance Mode: {Show(performanceMode)}\n[G] Use Dynamic Framing: {Show(Aruco.useDynamicFraming)}\n[U] Search for Hands" + 
+                $"\n[Q]-[W] X: {offset.X}\n[A]-[S] Y: {offset.Y}\n[Z]-[X] Z: {offset.Z}\n[E]-[R] Yaw\n[D]-[F] Pitch\n[C]-[V] Roll");
             if (ovrNotFound) {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"OVR not initialized, Restart app");
@@ -746,7 +747,7 @@ namespace TagTracking {
             } else if (key == ConsoleKey.B) {
                 clusterRotationGuess++;
                 if (clusterRotationGuess > 2) clusterRotationGuess = 0;
-                Console.WriteLine($"Guess cluster rotation: {(clusterRotationGuess == 0 ? "Disabled" : clusterRotationGuess == 1 ? "Enabled" : "CPU Heavy")}");
+                Console.WriteLine($"Guess tracker rotation: {(clusterRotationGuess == 0 ? "Disabled" : clusterRotationGuess == 1 ? "Enabled" : "CPU Heavy")}");
             }
             offsetMat.M41 = offsetMat.M41 + roomOffset.X;
             offsetMat.M42 = offsetMat.M42 + roomOffset.Y;
