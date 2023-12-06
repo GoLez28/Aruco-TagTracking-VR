@@ -69,7 +69,7 @@ namespace TagTracking {
                     else r1List.Add(curRot);
                     lastRot = curRot;
                 }
-                if (r1List.Count < r2List.Count && Program.preNoise != 0) {
+                if (r1List.Count < r2List.Count && (Program.preNoise == PreNoise.Enabled || Program.preNoise == PreNoise.EnabledSmooth)) {
                     if (r2List.Count > 7) rot = r2List[0];
                 }
 
@@ -92,7 +92,7 @@ namespace TagTracking {
                     else p1List.Add(curPos);
                     lastPos = curPos;
                 }
-                if (p1List.Count < p2List.Count && Program.preNoise != 0) {
+                if (p1List.Count < p2List.Count && (Program.preNoise == PreNoise.Enabled || Program.preNoise == PreNoise.EnabledSmooth)) {
                     if (p2List.Count > 7) pos = p2List[0];
                 }
 

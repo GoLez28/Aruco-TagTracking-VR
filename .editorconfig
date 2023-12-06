@@ -1,0 +1,4 @@
+﻿[*.cs]
+
+# CA1806: No omitir resultados del método
+dotnet_diagnostic.CA1806.severity = silent

@@ -19,6 +19,7 @@ namespace TagTracking {
             public PointF[] lockedVals = new PointF[4];
             public PointF[] prevVals = new PointF[4];
             public bool needUpdate = true;
+            public bool isRejected = false;
             public int time = 0;
             public bool locked;
         }
@@ -58,6 +59,9 @@ namespace TagTracking {
         public static string markerDictionary = "4x4x50";
         public static int markerIdsLength = 50;
         public static bool useDynamicFraming = true;
+        public static bool recoverRejecteds = true;
+        public static bool showRejected = true;
+        public static float rejectedDistanceTolerance = 5;
         //static Bitmap whiteLogo;
         //static Bitmap blackLogo;
         //static double[,,] whiteLogoGamma = new double[250, 100, 3];
@@ -237,11 +241,11 @@ namespace TagTracking {
         }
 
         static float smoothbenchmark = 0;
-        public static (VectorOfInt, VectorOfVectorOfPointF) GetCut(Mat frame, int x, int y, int width, int height, int i, int c) {
+        public static (VectorOfInt, VectorOfVectorOfPointF, VectorOfVectorOfPointF) GetCut(Mat frame, int x, int y, int width, int height, int i, int c) {
             VectorOfInt ids = new VectorOfInt(); // name/id of the detected markers
             VectorOfVectorOfPointF corners = new VectorOfVectorOfPointF(); // corners of the detected marker
+            VectorOfVectorOfPointF rejected = new VectorOfVectorOfPointF(); // rejected contours
             try {
-                VectorOfVectorOfPointF rejected = new VectorOfVectorOfPointF(); // rejected contours
                 Mat roi = new Mat(frame, new Rectangle(x, y, width, height));
                 ArucoInvoke.DetectMarkers(roi, ArucoDict, corners, ids, ArucoParameters, rejected);
                 //Mat show = new Mat(roi, new Rectangle(0, 0, frame.Width, frame.Height));
@@ -251,10 +255,14 @@ namespace TagTracking {
             } catch {
                 Console.WriteLine();
             }
-            return (ids, corners);
+            return (ids, corners, rejected);
         }
         public static void Update(int c) {
             int frameCount = 0;
+            PointF[][] prevCorners = new PointF[markerIdsLength][];
+            for (int i = 0; i < prevCorners.Length; i++) {
+                prevCorners[i] = new PointF[4];
+            }
             while (true) {
                 System.Diagnostics.Stopwatch arucoThreadWorkBenchmark = new System.Diagnostics.Stopwatch();
                 System.Diagnostics.Stopwatch arucoThreadIdleBenchmark = new System.Diagnostics.Stopwatch();
@@ -292,7 +300,7 @@ namespace TagTracking {
                             int sleepTime = Tag.cameras[c].waitTimeUpdate;
                             if (!ActiveCams) sleepTime *= 2;
                             if (Program.timer.ElapsedMilliseconds - Tag.cameras[c].lastSeenMarkerTime <= Tag.cameras[c].timeBeforeWaiting ||
-                            Program.timer.ElapsedMilliseconds - Tag.cameras[c].lastWaitCheck >= sleepTime) 
+                            Program.timer.ElapsedMilliseconds - Tag.cameras[c].lastWaitCheck >= sleepTime)
                                 break;
                         } else
                             break;
@@ -368,7 +376,7 @@ namespace TagTracking {
                         List<(int x, int y, int w, int h)> rects;
                         GetFrameRectangle(frame, c, (int)(frame.Width * xRatio), (int)(frame.Height * yRatio), out rects);
                         int numTasks = rects.Count;
-                        Task<(VectorOfInt, VectorOfVectorOfPointF)>[] tasks = new Task<(VectorOfInt, VectorOfVectorOfPointF)>[numTasks];
+                        Task<(VectorOfInt, VectorOfVectorOfPointF, VectorOfVectorOfPointF)>[] tasks = new Task<(VectorOfInt, VectorOfVectorOfPointF, VectorOfVectorOfPointF)>[numTasks];
                         if (numTasks > 0) {
                             for (int i = 0; i < numTasks; i++) {
                                 int taskId = i;
@@ -396,12 +404,21 @@ namespace TagTracking {
                                 var i2 = tasks[i].Result.Item2;
                                 i2 = AdjustDetectedRectsToCut(i2, rects[i].x, rects[i].y);
                                 corners.Push(i2);
+                                var i3 = tasks[i].Result.Item3;
+                                i3 = AdjustDetectedRectsToCut(i3, rects[i].x, rects[i].y);
+                                rejected.Push(i3);
                             }
+                        }
+                    }
+                    ShowAndRecoverRejected(c, frame, ids, corners, new VectorOfVectorOfPointF(prevCorners), rejected);
+                    for (int i = 0; i < corners.Size; i++) {
+                        for (int j = 0; j < corners[i].Size; j++) {
+                            prevCorners[ids[i]][j] = corners[i][j];
                         }
                     }
                     //smooth corners
                     try {
-                        if (Program.preNoise == 1) {
+                        if (Program.preNoise == Tag.PreNoise.DisabledSmooth || Program.preNoise == Tag.PreNoise.EnabledSmooth) {
                             corners = SmoothCorners(c, ids, corners, halfFrame);
                         }
                     } catch (Exception e) {
@@ -465,6 +482,43 @@ namespace TagTracking {
                 Program.threadsWorkTime[c + 2] = arucoThreadWorkBenchmark.Elapsed.TotalMilliseconds;
                 Program.threadsIdleTime[c + 2] = arucoThreadIdleBenchmark.Elapsed.TotalMilliseconds;
             }
+        }
+
+        private static void ShowAndRecoverRejected(int c, Mat frame, VectorOfInt ids, VectorOfVectorOfPointF corners, VectorOfVectorOfPointF prevCorners, VectorOfVectorOfPointF rejected) {
+            PointF[][] rects = new PointF[rejected.Size][];
+            for (int i = 0; i < rejected.Size; i++) {
+                rects[i] = new PointF[4];
+                rects[i] = rejected[i].ToArray();
+                if (Program.wantToShowFrame && showRejected) {
+                    //nvm incorrect order, looks cool
+                    CvInvoke.Line(frame, Point.Round(rects[i][0]), Point.Round(rects[i][1]), new Bgr(Color.Red).MCvScalar);
+                    CvInvoke.Line(frame, Point.Round(rects[i][0]), Point.Round(rects[i][2]), new Bgr(Color.Red).MCvScalar);
+                    CvInvoke.Line(frame, Point.Round(rects[i][3]), Point.Round(rects[i][2]), new Bgr(Color.Red).MCvScalar);
+                    CvInvoke.Line(frame, Point.Round(rects[i][3]), Point.Round(rects[i][1]), new Bgr(Color.Red).MCvScalar);
+                }
+
+                if (!recoverRejecteds) continue;
+                for (int j = 0; j < prevCorners.Size; j++) {
+                    if (prevCorners[j][0].X == 0) continue;
+                    int step = 0;
+                    int[] order = new int[4];
+                    for (int k = 0; k < prevCorners[j].Size; k++) {
+                        if (Math.Abs(rects[i][step].X - prevCorners[j][k].X) < rejectedDistanceTolerance && Math.Abs(rects[i][step].Y - prevCorners[j][k].Y) < rejectedDistanceTolerance) {
+                            order[k] = step;
+                            step++;
+                            if (step == 4) break;
+                            k = -1;
+                        }
+                    }
+                    if (step == 4) {
+                        corners.Push(new VectorOfPointF(new PointF[] { rects[i][order[0]], rects[i][order[1]], rects[i][order[2]], rects[i][order[3]] }));
+                        ids.Push(new int[] { j });
+                        betterRects[c][j].isRejected = true;
+                        break;
+                    }
+                }
+            }
+
         }
 
         private static Mat ResizeFrame(int c, int frameCount, Mat frame, int newRsWidth, int newRsHeight) {
@@ -674,11 +728,11 @@ namespace TagTracking {
                     int y = totalY;
                     int w = totalW;
                     int h = totalH;
-                    if (!Program.debugSendTrackerOSC) continue;
-                    CvInvoke.Line(frame, new Point(x, y), new Point(x + w, y), new Bgr(Color.Orange).MCvScalar, 2, LineType.AntiAlias);
-                    CvInvoke.Line(frame, new Point(x + w, y), new Point(x + w, y + h), new Bgr(Color.Orange).MCvScalar, 2, LineType.AntiAlias);
-                    CvInvoke.Line(frame, new Point(x + w, y + h), new Point(x, y + h), new Bgr(Color.Orange).MCvScalar, 2, LineType.AntiAlias);
-                    CvInvoke.Line(frame, new Point(x, y + h), new Point(x, y), new Bgr(Color.Orange).MCvScalar, 2, LineType.AntiAlias);
+                    //if (!Program.debugSendTrackerOSC) continue;
+                    //CvInvoke.Line(frame, new Point(x, y), new Point(x + w, y), new Bgr(Color.Orange).MCvScalar, 2, LineType.AntiAlias);
+                    //CvInvoke.Line(frame, new Point(x + w, y), new Point(x + w, y + h), new Bgr(Color.Orange).MCvScalar, 2, LineType.AntiAlias);
+                    //CvInvoke.Line(frame, new Point(x + w, y + h), new Point(x, y + h), new Bgr(Color.Orange).MCvScalar, 2, LineType.AntiAlias);
+                    //CvInvoke.Line(frame, new Point(x, y + h), new Point(x, y), new Bgr(Color.Orange).MCvScalar, 2, LineType.AntiAlias);
                 }
             }
         }
@@ -686,6 +740,7 @@ namespace TagTracking {
         private static VectorOfVectorOfPointF SmoothCorners(int c, VectorOfInt ids, VectorOfVectorOfPointF corners, bool fullFrame) {
             PointF[][] rects = new PointF[ids.Size][];
             float quickCornersSmoothFactor = (float)Math.Pow(cornersSmoothFactor, 0.6f);
+            float maxDist = Aruco.cornersMaxDistance;
             for (int i = 0; i < ids.Size; i++) {
                 rects[i] = new PointF[4];
                 int id = ids[i];
@@ -693,9 +748,13 @@ namespace TagTracking {
                 PointF[] prev = rectEx.prevVals;
                 PointF[] lokd = rectEx.lockedVals;
                 PointF[] curr = corners[i].ToArray();
+                if (betterRects[c][id].isRejected) {
+                    maxDist *= 2f;
+                    betterRects[c][id].isRejected = false;
+                }
                 int wrongs = 0;
                 for (int j = 0; j < 4; j++) {
-                    if (Math.Abs(prev[j].X - curr[j].X) > cornersMaxDistance || Math.Abs(prev[j].Y - curr[j].Y) > cornersMaxDistance)
+                    if (Math.Abs(prev[j].X - curr[j].X) > maxDist || Math.Abs(prev[j].Y - curr[j].Y) > maxDist)
                         wrongs++;
                 }
                 if (wrongs == 0) {
@@ -707,7 +766,7 @@ namespace TagTracking {
                     if (rectEx.locked) {
                         wrongs = 0;
                         for (int j = 0; j < 4; j++) {
-                            if (Math.Abs(lokd[j].X - curr[j].X) > cornersMaxDistance || Math.Abs(lokd[j].Y - curr[j].Y) > cornersMaxDistance)
+                            if (Math.Abs(lokd[j].X - curr[j].X) > maxDist || Math.Abs(lokd[j].Y - curr[j].Y) > maxDist)
                                 wrongs++;
                         }
                         if (wrongs > 1) {

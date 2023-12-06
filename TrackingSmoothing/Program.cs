@@ -22,7 +22,7 @@ namespace TagTracking {
         public static string poseAdjustWaist = "waist";
         public static float poseAdjustLegDist = 0.5f;
 
-        public static int preNoise = 1;
+        public static Tag.PreNoise preNoise = Tag.PreNoise.DisabledSmooth;
         public static int postNoise = 1;
         public static int clusterRotationGuess = 1;
         public static bool ignoreNoisyRotation = true;
@@ -554,7 +554,7 @@ namespace TagTracking {
                 }
             Console.WriteLine($"\n[Space] Show Hints\n[D1] Calibrate Camera Room Positions\n[D2] Manual Offset Adjust: {Show(adjustOffset)}\n[D3] Calibrate Trackers: {Show(TrackerCalibrate.onCalibration)}\n[D4] Calibrate Cameras (Distortion): {Show(CameraCalibrate.onCalibration)}\n[D5] Auto Adjust Offsets" +
                 $"\n[J] Reload Offsets\n[L] Reloaded Config/Trackers\n[D6] Show Cameras as Tracker 0: {Show(debugShowCamerasPosition)}\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}\n[D8] Reset Trackers (VMT)\n[D9] Show Camera Windows\n[D0] Clear Console" +
-                $"\n[M] Pre-Pose Noise Reduction: {(preNoise == 0 ? "Disabled" : preNoise == 1 ? "Enabled" : "Smooth rects off")}\n[N] Post-Pose Noise Reduction: {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}\n[B] Tracker Center Guessing: {(clusterRotationGuess == 0 ? "Disabled" : clusterRotationGuess == 1 ? "Enabled" : "CPU Heavy")}" +
+                $"\n[M] Pre-Pose Noise Reduction: {(preNoise == Tag.PreNoise.Disabled ? "Disabled" : preNoise == Tag.PreNoise.DisabledSmooth ? "Disabled + Smooth rects" : preNoise == Tag.PreNoise.EnabledSmooth ? "Enabled + Smooth rects" : "Enabled")}\n[N] Post-Pose Noise Reduction: {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}\n[B] Tracker Center Guessing: {(clusterRotationGuess == 0 ? "Disabled" : clusterRotationGuess == 1 ? "Enabled" : "CPU Heavy")}" +
                 $"\n[H] Enable Performance Mode: {Show(performanceMode)}\n[G] Use Dynamic Framing: {Show(Aruco.useDynamicFraming)}\n[U] Search for Hands" + 
                 $"\n[Q]-[W] X: {offset.X}\n[A]-[S] Y: {offset.Y}\n[Z]-[X] Z: {offset.Z}\n[E]-[R] Yaw\n[D]-[F] Pitch\n[C]-[V] Roll");
             if (ovrNotFound) {
@@ -737,8 +737,10 @@ namespace TagTracking {
                 }
             } else if (key == ConsoleKey.M) {
                 preNoise++;
-                if (preNoise > 2) preNoise = 0;
-                Console.WriteLine($"Toggle pre-pose noise reduction {(preNoise == 0 ? "Disabled" : preNoise == 1 ? "Enabled" : "Smooth rects off")}");
+                if ((int)preNoise > 3) preNoise = 0;
+                Console.WriteLine($"Toggle pre-pose noise reduction {(preNoise == Tag.PreNoise.Disabled ? "Disabled" : preNoise == Tag.PreNoise.DisabledSmooth ? "Disabled + Smooth rects" : preNoise == Tag.PreNoise.EnabledSmooth ? "Enabled + Smooth rects" : "Enabled")}");
+                if (preNoise == Tag.PreNoise.Enabled || preNoise == Tag.PreNoise.EnabledSmooth)
+                    Console.WriteLine("\tHaving it enabled can be buggy and cause flickering.\n\tIt is recommended to use 'Disabled + Smooth rects'");
             } else if (key == ConsoleKey.N) {
                 postNoise++;
                 if (postNoise > 2) postNoise = 0;
@@ -895,7 +897,7 @@ namespace TagTracking {
                 else if (split[0].Equals("poseAdjustPanAngleRight")) Tag.panAngleR = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("poseAdjustPanAngleLeft")) Tag.panAngleL = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("poseAdjustWaist")) poseAdjustWaist = split[1];
-                else if (split[0].Equals("preNoiseReduction")) preNoise = int.Parse(split[1]);
+                else if (split[0].Equals("preNoiseReduction")) preNoise = (Tag.PreNoise)int.Parse(split[1]);
                 else if (split[0].Equals("postNoiseReduction")) postNoise = int.Parse(split[1]);
                 else if (split[0].Equals("enableIgnoreNoisyRotation")) ignoreNoisyRotation = split[1].Equals("true");
                 else if (split[0].Equals("oscAddress")) oscAddress = split[1];
@@ -924,6 +926,9 @@ namespace TagTracking {
                 else if (split[0].Equals("markerDictionary")) Aruco.markerDictionary = split[1].ToLower();
                 else if (split[0].Equals("performanceUnderSample")) performanceUnderSample = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("autoActivatePerformanceMode")) autoActivatePerformanceMode = split[1].Equals("true");
+                else if (split[0].Equals("showRejected")) Aruco.showRejected = split[1].Equals("true");
+                else if (split[0].Equals("recoverRejected")) Aruco.recoverRejecteds = split[1].Equals("true");
+                else if (split[0].Equals("rejectedDistanceTolerance")) Aruco.rejectedDistanceTolerance = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("refinementMethod")) {
                     Aruco.refinementMethod = int.Parse(split[1]);
                     Aruco.ApplyParams();
