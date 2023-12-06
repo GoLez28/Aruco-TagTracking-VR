@@ -341,7 +341,9 @@ namespace TagTracking {
                             if (cameras[j].newData)
                                 rawTrackers[i].updateCount[j]++;
                             if (rawTrackers[i].updateCount[j] > 2) continue;
-                            Program.oscClientDebug.Send($"/debug/trackers/position", i, j, poss[j].Translation.X, poss[j].Translation.Z, poss[j].Translation.Y);
+                            Vector3 p = poss[j].Translation;
+                            Quaternion q = poss[j].Rotation();
+                            Program.oscClientDebug.Send($"/debug/trackers/position", i, j, p.X, p.Z, p.Y, -q.X, -q.Z, -q.Y, q.W);
                         }
                     }
                 }
@@ -358,7 +360,9 @@ namespace TagTracking {
                 CombinedTracker tracker = combinedTrackers[i];
                 Matrix4x4[] poss = tracker.Obtain();
                 for (int j = 0; j < poss.Length; j++) {
-                    Program.oscClientDebug.Send($"/debug/trackers/position", i, j, poss[j].Translation.X, poss[j].Translation.Z, poss[j].Translation.Y);
+                    Vector3 p = poss[j].Translation;
+                    Quaternion q = poss[j].Rotation();
+                    Program.oscClientDebug.Send($"/debug/trackers/position", i, j, p.X, p.Z, p.Y, -q.X, -q.Z, -q.Y, q.W);
                 }
             }
         }
