@@ -410,7 +410,11 @@ namespace TagTracking {
                             }
                         }
                     }
-                    ShowAndRecoverRejected(c, frame, ids, corners, new VectorOfVectorOfPointF(prevCorners), rejected);
+                    VectorOfVectorOfPointF clearedCorners;
+                    VectorOfInt clearedIds;
+                    FilterRejecteds(c, prevCorners, frame, corners, rejected, out clearedCorners, out clearedIds);
+                    corners.Push(clearedCorners);
+                    ids.Push(clearedIds);
                     for (int i = 0; i < corners.Size; i++) {
                         for (int j = 0; j < corners[i].Size; j++) {
                             prevCorners[ids[i]][j] = corners[i][j];
@@ -484,6 +488,74 @@ namespace TagTracking {
             }
         }
 
+        private static void FilterRejecteds(int c, PointF[][] prevCorners, Mat frame, VectorOfVectorOfPointF corners, VectorOfVectorOfPointF rejected, out VectorOfVectorOfPointF clearedCorners, out VectorOfInt clearedIds) {
+            VectorOfVectorOfPointF savedCorners = new VectorOfVectorOfPointF();
+            VectorOfInt savedIds = new VectorOfInt();
+            ShowAndRecoverRejected(c, frame, savedIds, savedCorners, new VectorOfVectorOfPointF(prevCorners), rejected);
+            clearedCorners = new VectorOfVectorOfPointF();
+            clearedIds = new VectorOfInt();
+            for (int i = 0; i < savedCorners.Size; i++) {
+                PointF[] savedCornerPoints = savedCorners[i].ToArray();
+                bool intersect = false;
+                for (int j = 0; j < corners.Size; j++) {
+                    PointF[] cornerPoints = corners[j].ToArray();
+                    if (CheckPolygonIntersection(savedCornerPoints, cornerPoints)) {
+                        intersect = true;
+                        break;
+                    }
+                }
+                if (!intersect) {
+                    clearedCorners.Push(new VectorOfPointF(savedCornerPoints));
+                    clearedIds.Push(new int[] { savedIds[i] });
+                }
+            }
+        }
+
+        static bool CheckPolygonIntersection(PointF[] polygon1, PointF[] polygon2) {
+            for (int i = 0; i < polygon1.Length; i++) {
+                int nextIndex = (i + 1) % polygon1.Length;
+                PointF p1 = polygon1[i];
+                PointF p2 = polygon1[nextIndex];
+
+                // Obtener el eje perpendicular al borde del polígono
+                PointF axis = new PointF(p2.Y - p1.Y, -(p2.X - p1.X));
+
+                // Normalizar el eje
+                double length = Math.Sqrt(axis.X * axis.X + axis.Y * axis.Y);
+                axis = new PointF((float)(axis.X / length), (float)(axis.Y / length));
+
+                // Proyectar los puntos de ambos polígonos en el eje
+                double min1, max1, min2, max2;
+                ProjectPolygon(axis, polygon1, out min1, out max1);
+                ProjectPolygon(axis, polygon2, out min2, out max2);
+
+                // Verificar si las proyecciones no se solapan
+                if (!(max2 >= min1 && max1 >= min2)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // Función para proyectar un polígono en un eje y obtener los límites de la proyección
+        static void ProjectPolygon(PointF axis, PointF[] polygon, out double min, out double max) {
+            min = double.PositiveInfinity;
+            max = double.NegativeInfinity;
+
+            foreach (PointF point in polygon) {
+                double projection = (axis.X * point.X + axis.Y * point.Y);
+
+                if (projection < min) {
+                    min = projection;
+                }
+
+                if (projection > max) {
+                    max = projection;
+                }
+            }
+        }
+
         private static void ShowAndRecoverRejected(int c, Mat frame, VectorOfInt ids, VectorOfVectorOfPointF corners, VectorOfVectorOfPointF prevCorners, VectorOfVectorOfPointF rejected) {
             PointF[][] rects = new PointF[rejected.Size][];
             for (int i = 0; i < rejected.Size; i++) {
@@ -501,12 +573,13 @@ namespace TagTracking {
                 for (int j = 0; j < prevCorners.Size; j++) {
                     if (prevCorners[j][0].X == 0) continue;
                     int step = 0;
-                    int[] order = new int[4];
+                    int[] order = new int[] { 0, 1, 2, 3 };
                     for (int k = 0; k < prevCorners[j].Size; k++) {
                         if (Math.Abs(rects[i][step].X - prevCorners[j][k].X) < rejectedDistanceTolerance && Math.Abs(rects[i][step].Y - prevCorners[j][k].Y) < rejectedDistanceTolerance) {
                             order[k] = step;
                             step++;
-                            if (step == 4) break;
+                            if (step == 4) 
+                                break;
                             k = -1;
                         }
                     }
