@@ -199,14 +199,9 @@ namespace TagTracking {
             if (!Program.debugSendTrackerOSC) {
                 return;
             }
-            Matrix4x4 point1 = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(Aruco.markersLength / 2000f, Aruco.markersLength / 2000f, 0)), trackerAvg[index]);
-            Matrix4x4 point2 = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-Aruco.markersLength / 2000f, Aruco.markersLength / 2000f, 0)), trackerAvg[index]);
-            Matrix4x4 point3 = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(Aruco.markersLength / 2000f, -Aruco.markersLength / 2000f, 0)), trackerAvg[index]);
-            Matrix4x4 point4 = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-Aruco.markersLength / 2000f, -Aruco.markersLength / 2000f, 0)), trackerAvg[index]);
-            Program.oscClientDebug.Send("/debug/calibrate/position", 0, 0, point1.Translation.X * 5, point1.Translation.Z * 5, point1.Translation.Y * 5);
-            Program.oscClientDebug.Send("/debug/calibrate/position", 0, 0, point2.Translation.X * 5, point2.Translation.Z * 5, point2.Translation.Y * 5);
-            Program.oscClientDebug.Send("/debug/calibrate/position", 0, 0, point3.Translation.X * 5, point3.Translation.Z * 5, point3.Translation.Y * 5);
-            Program.oscClientDebug.Send("/debug/calibrate/position", 0, 0, point4.Translation.X * 5, point4.Translation.Z * 5, point4.Translation.Y * 5);
+            Vector3 avgPos = trackerAvg[index].Translation;
+            Quaternion avgRot = Quaternion.CreateFromRotationMatrix(trackerAvg[index]);
+            Program.oscClientDebug.Send("/debug/calibrate/position", 0, 0, avgPos.X*5, avgPos.Z*5, avgPos.Y*5, -avgRot.X, -avgRot.Z, -avgRot.Y, avgRot.W, Aruco.markersLength);
         }
 
         private static void ShowFinalPointsDebug() {
@@ -221,12 +216,10 @@ namespace TagTracking {
                 final.M41 *= 5;
                 final.M42 *= 5;
                 final.M43 *= 5;
+                Vector3 finalPos = final.Translation;
+                Quaternion finalRot = Quaternion.CreateFromRotationMatrix(final);
                 Program.oscClientDebug.Send("/debug/calibrate/position", index, 1,
-                                           final.Translation.X, final.Translation.Z, final.Translation.Y);
-                Matrix4x4 point = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0, 0, 0.25f)), final);
-                Vector3 pointPos = point.Translation;
-                Program.oscClientDebug.Send("/debug/calibrate/position", index + 10, 2,
-                                           pointPos.X, pointPos.Z, pointPos.Y);
+                                           finalPos.X, finalPos.Z, finalPos.Y, -finalRot.X, -finalRot.Z, -finalRot.Y, finalRot.W, ids[index]);
             }
         }
 
