@@ -643,10 +643,10 @@ namespace TagTracking {
                         estimatedPos[i] = newMat.Translation;
                         estimatedRot[i] = newMat.Rotation();
                         if (final) {
-                            trackerPresence[i] -= straightTrackerWeight;
+                            trackerPresence[i] -= straightTrackerWeight + trackerStraightness[i];
 
                             int camera = i % cameras.Length;
-                            float min = Utils.GetMap(cameras[camera].quality, 1f, 2f, 50f, 0f);
+                            float min = Utils.GetMap(cameras[camera].quality, 1f, 2f, 50f, 0f) + ((float)Math.Pow(trackerStraightness[i] * 2, 2) * 40);
                             min = (float)Math.Max(min, 0);
                             if (trackerPresence[i] < min)
                                 trackerPresence[i] = min;
@@ -704,6 +704,8 @@ namespace TagTracking {
                         }
                         if (final) {
                             trackerPresence[i] += straightTrackerWeight * 2;
+                            float max = 100 + ((float)Math.Pow(trackerStraightness[i] * 2, 2) * 40);
+                            max = (float)Math.Max(max, 0);
                             if (trackerPresence[i] > 100)
                                 trackerPresence[i] = 100;
                             //trackerPresence[i] = 100;
