@@ -240,7 +240,8 @@ namespace TagTracking {
                             else if (split2[0].Equals("generatedByCalibration")) currentTracker.generatedByCalibration = split2[1].Equals("true");
 
                         } else {
-                            trackerss.Add(currentTracker);
+                            if (!currentTracker.trackerName[0].Equals(';'))
+                                trackerss.Add(currentTracker);
                             currentTracker = null;
                         }
                     }
@@ -273,7 +274,8 @@ namespace TagTracking {
                 offsets.Add(offset);
             }
             if (currentTracker != null) {
-                trackerss.Add(currentTracker);
+                if (!currentTracker.trackerName[0].Equals(';'))
+                    trackerss.Add(currentTracker);
             }
             trackers = trackerss.ToArray();
             //Extrapolation
