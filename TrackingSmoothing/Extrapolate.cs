@@ -16,7 +16,7 @@ namespace TagTracking {
             public int index = -1;
             public Quaternion rotation = Quaternion.Identity;
             public string trackbase = "";
-            public int inactiveSince = 0;
+            public bool notSeen = false;
             Vector3 lastPosGiven = new();
             Quaternion lastRotGiven = Quaternion.Identity;
             public Tracker(Vector3 pos, Quaternion rot, int i) {
@@ -123,7 +123,7 @@ namespace TagTracking {
                     if (Program.debugShowCamerasPosition && Program.debugTrackerToBorrow == i) continue;
                     (Vector3 pos, Quaternion q) = trackers[i].GetEstimatedPosition();
                     Matrix4x4 preSmooth = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(q), Matrix4x4.CreateTranslation(pos));
-                    preSmooth = Tag.GetOffsetTracker(preSmooth, Tag.trackers[i].trackerFollowWeight, Tag.trackers[i].leftElbowtrackerFollowWeight, Tag.trackers[i].rightElbowtrackerFollowWeight);
+                    preSmooth = Tag.GetOffsetTracker(preSmooth, Tag.trackers[i].trackerFollowWeight, !trackers[i].notSeen, Tag.trackers[i].leftElbowtrackerFollowWeight, Tag.trackers[i].rightElbowtrackerFollowWeight);
                     pos = preSmooth.Translation;
                     q = Quaternion.CreateFromRotationMatrix(preSmooth);
                     //Quaternion q = trackers[i].rotation;

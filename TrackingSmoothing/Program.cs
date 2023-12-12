@@ -20,6 +20,13 @@ namespace TagTracking {
 
         public static bool poseAdjust = true;
         public static string poseAdjustWaist = "waist";
+        public static string poseAdjustChest = "chest";
+        public static string poseAdjustLeftFoot = "leftfoot";
+        public static string poseAdjustRightFoot = "rightfoot";
+        public static string poseAdjustLeftElbow = "leftarm";
+        public static string poseAdjustRightElbow = "rightarm";
+        public static string poseAdjustLeftKnee = "leftknee";
+        public static string poseAdjustRightKnee = "rightknee";
         public static float poseAdjustLegDist = 0.5f;
 
         public static Tag.PreNoise preNoise = Tag.PreNoise.DisabledSmooth;
@@ -272,28 +279,28 @@ namespace TagTracking {
                 var mlh = devPos[leftHandID].mDeviceToAbsoluteTracking;
                 Matrix4x4 hmdRotMatLH = new Matrix4x4(mlh.m0, mlh.m4, mlh.m8, 0, mlh.m1, mlh.m5, mlh.m9, 0, mlh.m2, mlh.m6, mlh.m10, 0, mlh.m3, mlh.m7, mlh.m11, 1);
                 Vector3 hmdPosV3LH = hmdRotMatLH.Translation;
-                oscClientDebug.Send("/debug/final/position", 8,
+                oscClientDebug.Send("/debug/final/position", 18,
                                    hmdPosV3LH.X, hmdPosV3LH.Y, -hmdPosV3LH.Z, //1f, 1.7f, 1f
-                                   0f, 0f, 0f, 1f);
+                                   0f, 1f, 1f, 0f, "L_Hand");
                 //righthand
                 var mrh = devPos[rightHandID].mDeviceToAbsoluteTracking;
                 Matrix4x4 hmdRotMatRH = new Matrix4x4(mrh.m0, mrh.m4, mrh.m8, 0, mrh.m1, mrh.m5, mrh.m9, 0, mrh.m2, mrh.m6, mrh.m10, 0, mrh.m3, mrh.m7, mrh.m11, 1);
                 Vector3 hmdPosV3RH = hmdRotMatRH.Translation;
-                oscClientDebug.Send("/debug/final/position", 7,
+                oscClientDebug.Send("/debug/final/position", 17,
                                    hmdPosV3RH.X, hmdPosV3RH.Y, -hmdPosV3RH.Z, //1f, 1.7f, 1f
-                                   0f, 0f, 0f, 1f);
+                                   0f, 1f, 1f, 0f, "R_Hand");
 
-                oscClientDebug.Send("/debug/final/position", 10,
+                oscClientDebug.Send("/debug/final/position", 16,
                                    hmdPosV3.X, hmdPosV3.Y, -hmdPosV3.Z, //1f, 1.7f, 1f
-                                   0f, 0f, 0f, 1f);
+                                   0f, 1f, 1f, 0f, "Head");
 
                 Matrix4x4 mat = hmdRotMat;
                 //mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), mat);
                 ////mat.M42 = hmdRotMat.M42;
                 Vector3 matT = mat.Translation;
-                oscClientDebug.Send("/debug/final/position", 9,
+                oscClientDebug.Send("/debug/final/position", 15,
                                            matT.X, matT.Y, -matT.Z, //1f, 1.7f, 1f
-                                           0f, 0f, 0f, 1f);
+                                           0f, 1f, 1f, 0f, "HMD");
                 int waist = -1;
                 for (int i = 0; i < Tag.finals.Length; i++) {
                     if (Tag.finals[i].name.Equals(poseAdjustWaist))
@@ -302,9 +309,9 @@ namespace TagTracking {
                 Vector3 pos = Tag.finals[waist].fpos;
 
                 mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, -0.09f, 0f)), hmdCentered);
-                oscClientDebug.Send("/debug/final/position", 6,
+                oscClientDebug.Send("/debug/final/position", 14,
                                            mat.Translation.X, mat.Translation.Y, -mat.Translation.Z, //1f, 1.7f, 1f
-                                           0, 0, 0, 1);
+                                           0f, 1f, 1f, 0f, "Neck");
 
                 //Quaternion q = Tag.finals[waist].frot;
                 //Matrix4x4 matw = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(q), Matrix4x4.CreateTranslation(pos));

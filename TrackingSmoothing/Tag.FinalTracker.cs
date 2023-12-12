@@ -19,6 +19,8 @@ namespace TagTracking {
             public float rVel;
             public float velScore;
             public long lastTimeSeen = 0;
+            public bool notSeen = false;
+            public bool firstTimeFaking = false;
 
             public OneEuroFilter<Vector3> smoothedPos = new OneEuroFilter<Vector3>(2); //w 25
             public OneEuroFilter<Quaternion> smoothedRot = new OneEuroFilter<Quaternion>(5); //w 150

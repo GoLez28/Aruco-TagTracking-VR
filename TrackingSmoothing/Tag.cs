@@ -450,6 +450,8 @@ namespace TagTracking {
                 if (!trackers[i].trackerNotSeen) {
                     finals[i].lastTimeSeen = Program.timer.ElapsedMilliseconds;
                 }
+                finals[i].notSeen = trackers[i].trackerNotSeen;
+                if (!finals[i].notSeen) finals[i].firstTimeFaking = true;
                 finals[i].preMat = mat;
 
                 Vector3 pos = mat.Translation;
@@ -501,7 +503,7 @@ namespace TagTracking {
                 Matrix4x4 mat = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(finals[i].frot), Matrix4x4.CreateTranslation(finals[i].fpos));
                 Matrix4x4 preSmooth = mat;
                 if (!Program.useInterpolation)
-                    preSmooth = GetOffsetTracker(preSmooth, trackers[i].trackerFollowWeight, trackers[i].leftElbowtrackerFollowWeight, trackers[i].rightElbowtrackerFollowWeight);
+                    preSmooth = GetOffsetTracker(preSmooth, trackers[i].trackerFollowWeight, !finals[i].notSeen, trackers[i].leftElbowtrackerFollowWeight, trackers[i].rightElbowtrackerFollowWeight);
                 Vector3 pos = preSmooth.Translation;
                 Quaternion q = preSmooth.Rotation();
                 finals[i].fpos = pos;
@@ -517,9 +519,11 @@ namespace TagTracking {
             newInfo = false;
         }
 
-        public static Matrix4x4 GetOffsetTracker(Matrix4x4 mat, float headWeight, float leftHandWeight = 1, float rightHandWeight = 1) {
+        public static Matrix4x4 GetOffsetTracker(Matrix4x4 mat, float headWeight, bool applyDelay, float leftHandWeight = 1, float rightHandWeight = 1) {
             Vector4 headPos = Program.hmdList[0];
             mat = Matrix4x4.Multiply(mat, Program.offsetMat);
+            if (!applyDelay) return mat;
+
             mat.M41 -= (headPos.X - Program.hmdPos[0]) * headWeight;
             mat.M43 -= (headPos.Y - Program.hmdPos[1]) * headWeight;
             mat.M42 += (headPos.Z - Program.hmdPos[2]) * headWeight;
@@ -554,6 +558,7 @@ namespace TagTracking {
                 Vector3 pos = finals[i].fpos;
                 Quaternion q = finals[i].frot;
                 if (Program.useInterpolation) {
+                    Extrapolate.trackers[i].notSeen = finals[i].notSeen;
                     Extrapolate.trackers[i].UpdatePos(pos, q, i);
                 } else {
                     SendTracker(i, pos, q);
@@ -604,7 +609,7 @@ namespace TagTracking {
                 if (Program.debugSendTrackerOSC) {
                     Program.oscClientDebug.Send("/debug/final/position", i + 1,
                                            pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
-                                           -q.X, -q.Z, -q.Y, q.W);
+                                           -q.X, -q.Z, -q.Y, q.W, finals[i].name);
                 }
             }
         }
@@ -752,6 +757,41 @@ namespace TagTracking {
                     Quaternion.CreateFromAxisAngle(new Vector3(0, 0, 1), angHor),
                     Quaternion.CreateFromAxisAngle(new Vector3(0, 1, 0), angVer * -4)),
                     0.5f);
+
+                Program.rightHandPos.Z = (float)Math.Sin(Program.timer.ElapsedMilliseconds / 4000.0);
+                Program.rightHandPos.X = (float)Math.Cos(Program.timer.ElapsedMilliseconds / 4000.0);
+
+                Quaternion forward = Quaternion.CreateFromAxisAngle(new Vector3(0, 0, 1), 0);
+                Quaternion leftward = Quaternion.CreateFromAxisAngle(new Vector3(0, 0, 1), (float)(Math.PI * 0.5f));
+                Quaternion backward = Quaternion.CreateFromAxisAngle(new Vector3(0, 0, 1), (float)(Math.PI));
+                Quaternion rightward = Quaternion.CreateFromAxisAngle(new Vector3(0, 0, 1), (float)(Math.PI * 1.5f));
+
+                float c = (float)Math.Sqrt(Math.Pow(-Program.rightHandPos.Z, 2) + Math.Pow(Program.rightHandPos.X, 2));
+                float sin = -Program.rightHandPos.Z / c;
+                float cos = Program.rightHandPos.X / c;
+                Quaternion lookat = forward;
+                float th = (float)Math.Atan2(sin, cos);
+                float m = th + (float)Math.PI;
+                m /= (float)Math.PI / 2;
+                m = m % 1;
+                Console.WriteLine(th);
+                if (sin > 0 && sin < 1 && cos > 0 && cos < 1) {
+                    lookat = Quaternion.Lerp(forward, leftward, m);
+                } else if (sin > 0 && sin < 1 && cos < 0 && cos > -1) {
+                    lookat = Quaternion.Lerp(leftward, backward, m);
+                } else if (sin < 0 && sin > -1 && cos < 0 && cos > -1) {
+                    lookat = Quaternion.Lerp(backward, rightward, m);
+                } else if (sin < 0 && sin > -1 && cos > 0 && cos < 1) {
+                    lookat = Quaternion.Lerp(rightward, forward, m);
+                }
+                //Matrix4x4 lookMat = Matrix4x4.CreateLookAt(Program.rightHandPos, Program.shoulderCenterPos, new Vector3(0, sin, Math.Abs(cos)));
+
+                Vector3 posFix = new(Program.rightHandPos.X, -Program.rightHandPos.Z, Program.rightHandPos.Y);
+                //lookMat = Matrix4x4.Multiply(lookMat, Utils.MatrixInvert(Program.offsetMat));
+                //Quaternion lookRot = Quaternion.CreateFromRotationMatrix(lookMat);
+                //Quaternion lookRotFix = new Quaternion(lookRot.X, lookRot.Y, lookRot.Z, lookRot.W);
+                finals[adjustablesElbow[i]].rot = lookat;
+                finals[adjustablesElbow[i]].pos = posFix;
                 //finals[adjustablesElbow[i]].pos = os.Translation;
             }
 
