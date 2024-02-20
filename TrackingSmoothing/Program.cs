@@ -11,6 +11,12 @@ using Emgu.CV.Util; // the side kick
 using System.Collections.Generic;
 using System.Numerics;
 using System.IO;
+using Valve.VR;
+using System.Drawing.Drawing2D;
+using Emgu.CV.DepthAI;
+using Emgu.CV.Ocl;
+using Emgu.CV.PpfMatch3d;
+using static Emgu.Util.Platform;
 
 namespace TagTracking {
     class Program {
@@ -21,13 +27,16 @@ namespace TagTracking {
         public static bool poseAdjust = true;
         public static string poseAdjustWaist = "waist";
         public static string poseAdjustChest = "chest";
-        public static string poseAdjustLeftFoot = "leftfoot";
-        public static string poseAdjustRightFoot = "rightfoot";
-        public static string poseAdjustLeftElbow = "leftarm";
-        public static string poseAdjustRightElbow = "rightarm";
-        public static string poseAdjustLeftKnee = "leftknee";
-        public static string poseAdjustRightKnee = "rightknee";
+        public static string poseAdjustLeftLeg = "leftfoot";
+        public static string poseAdjustRightLeg = "rightfoot";
+        public static string poseAdjustLeftArm = "leftarm";
+        public static string poseAdjustRightArm = "rightarm";
+        public static string poseAdjustLeftFoot = "leftpaw"; //lol
+        public static string poseAdjustRightFoot = "rightpaw";
         public static float poseAdjustLegDist = 0.5f;
+
+        public static int virtualLeftHandIndex = -1;
+        public static int virtualRightHandIndex = -1;
 
         public static Tag.PreNoise preNoise = Tag.PreNoise.DisabledSmooth;
         public static int postNoise = 1;
@@ -251,6 +260,7 @@ namespace TagTracking {
                     prevCont = m2;
                 }
             }
+
             Matrix4x4 hmdRotMat, hmdCentered;
             Vector3 hmdPosV3;
             GetDevices(out hmdRotMat, out hmdCentered, out hmdPosV3);
@@ -281,18 +291,18 @@ namespace TagTracking {
                 Vector3 hmdPosV3LH = hmdRotMatLH.Translation;
                 oscClientDebug.Send("/debug/final/position", 18,
                                    hmdPosV3LH.X, hmdPosV3LH.Y, -hmdPosV3LH.Z, //1f, 1.7f, 1f
-                                   0f, 1f, 1f, 0f, "L_Hand");
+                                   0f, 1f, 1f, 0f, "L_Hand", 0);
                 //righthand
                 var mrh = devPos[rightHandID].mDeviceToAbsoluteTracking;
                 Matrix4x4 hmdRotMatRH = new Matrix4x4(mrh.m0, mrh.m4, mrh.m8, 0, mrh.m1, mrh.m5, mrh.m9, 0, mrh.m2, mrh.m6, mrh.m10, 0, mrh.m3, mrh.m7, mrh.m11, 1);
                 Vector3 hmdPosV3RH = hmdRotMatRH.Translation;
                 oscClientDebug.Send("/debug/final/position", 17,
                                    hmdPosV3RH.X, hmdPosV3RH.Y, -hmdPosV3RH.Z, //1f, 1.7f, 1f
-                                   0f, 1f, 1f, 0f, "R_Hand");
+                                   0f, 1f, 1f, 0f, "R_Hand", 0);
 
                 oscClientDebug.Send("/debug/final/position", 16,
                                    hmdPosV3.X, hmdPosV3.Y, -hmdPosV3.Z, //1f, 1.7f, 1f
-                                   0f, 1f, 1f, 0f, "Head");
+                                   0f, 1f, 1f, 0f, "Head", 0);
 
                 Matrix4x4 mat = hmdRotMat;
                 //mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), mat);
@@ -300,18 +310,17 @@ namespace TagTracking {
                 Vector3 matT = mat.Translation;
                 oscClientDebug.Send("/debug/final/position", 15,
                                            matT.X, matT.Y, -matT.Z, //1f, 1.7f, 1f
-                                           0f, 1f, 1f, 0f, "HMD");
+                                           0f, 1f, 1f, 0f, "HMD", 0);
                 int waist = -1;
                 for (int i = 0; i < Tag.finals.Length; i++) {
                     if (Tag.finals[i].name.Equals(poseAdjustWaist))
                         waist = i;
                 }
-                Vector3 pos = Tag.finals[waist].fpos;
 
                 mat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, -0.09f, 0f)), hmdCentered);
                 oscClientDebug.Send("/debug/final/position", 14,
                                            mat.Translation.X, mat.Translation.Y, -mat.Translation.Z, //1f, 1.7f, 1f
-                                           0f, 1f, 1f, 0f, "Neck");
+                                           0f, 1f, 1f, 0f, "Neck", 0);
 
                 //Quaternion q = Tag.finals[waist].frot;
                 //Matrix4x4 matw = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(q), Matrix4x4.CreateTranslation(pos));
@@ -326,7 +335,7 @@ namespace TagTracking {
                 Console.WriteLine("Adjusted offsets");
             }
             if (needsToSearchHands) {
-                SearchHands(hmdCentered);
+                SetDefaultPose(hmdCentered);
             }
             mainThreadBenchmark.Stop();
             threadsWorkTime[0] = mainThreadBenchmark.Elapsed.TotalMilliseconds;
@@ -382,7 +391,7 @@ namespace TagTracking {
             shoulderCenterPos = shoulderMat.Translation;
         }
 
-        static void SearchHands(Matrix4x4 hmdCentered) {
+        static void SetDefaultPose(Matrix4x4 hmdCentered) {
             needsToSearchHands = false;
             Matrix4x4 matLeft = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0.5f, 0f, 0f)), hmdCentered);
             Matrix4x4 matRight = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-0.5f, 0f, 0f)), hmdCentered);
@@ -562,12 +571,27 @@ namespace TagTracking {
             Console.WriteLine($"\n[Space] Show Hints\n[D1] Calibrate Camera Room Positions\n[D2] Manual Offset Adjust: {Show(adjustOffset)}\n[D3] Calibrate Trackers: {Show(TrackerCalibrate.onCalibration)}\n[D4] Calibrate Cameras (Distortion): {Show(CameraCalibrate.onCalibration)}\n[D5] Auto Adjust Offsets" +
                 $"\n[J] Reload Offsets\n[L] Reloaded Config/Trackers\n[D6] Show Cameras as Tracker 0: {Show(debugShowCamerasPosition)}\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}\n[D8] Reset Trackers (VMT)\n[D9] Show Camera Windows\n[D0] Clear Console" +
                 $"\n[M] Pre-Pose Noise Reduction: {(preNoise == Tag.PreNoise.Disabled ? "Disabled" : preNoise == Tag.PreNoise.DisabledSmooth ? "Disabled + Smooth rects" : preNoise == Tag.PreNoise.EnabledSmooth ? "Enabled + Smooth rects" : "Enabled")}\n[N] Post-Pose Noise Reduction: {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}\n[B] Tracker Center Guessing: {(clusterRotationGuess == 0 ? "Disabled" : clusterRotationGuess == 1 ? "Enabled" : "CPU Heavy")}" +
-                $"\n[H] Enable Performance Mode: {Show(performanceMode)}\n[G] Use Dynamic Framing: {Show(Aruco.useDynamicFraming)}\n[U] Search for Hands" + 
+                $"\n[H] Enable Performance Mode: {Show(performanceMode)}\n[G] Use Dynamic Framing: {Show(Aruco.useDynamicFraming)}\n[U] Reset Default Pose" +
                 $"\n[Q]-[W] X: {offset.X}\n[A]-[S] Y: {offset.Y}\n[Z]-[X] Z: {offset.Z}\n[E]-[R] Yaw\n[D]-[F] Pitch\n[C]-[V] Roll");
             if (ovrNotFound) {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"OVR not initialized, Restart app");
                 Console.ResetColor();
+            }
+        }
+        static void KeyReleased() {
+            if (virtualRightHandIndex != -1) {
+                Console.WriteLine("release");
+                for (int i = 0; i < 8; i++) {
+                    oscClient.Send("/VMT/Input/Button", virtualRightHandIndex, i, 0f, 0);
+                }
+                oscClient.Send("/VMT/Input/Trigger", virtualRightHandIndex, 0, 0f, 0f);
+                oscClient.Send("/VMT/Input/Trigger", virtualRightHandIndex, 1, 0f, 0f);
+
+                oscClient.Send("/VMT/Input/Joystick", virtualRightHandIndex, 0, 0f, 0f, 0f);
+                oscClient.Send("/VMT/Input/Joystick", virtualRightHandIndex, 0, 0f, 0f, 0f);
+                oscClient.Send("/VMT/Input/Joystick", virtualRightHandIndex, 0, 0f, 0f, 0f);
+                oscClient.Send("/VMT/Input/Joystick", virtualRightHandIndex, 0, 0f, 0f, 0f);
             }
         }
         static void KeyPressed(ConsoleKey key) {
@@ -757,6 +781,32 @@ namespace TagTracking {
                 clusterRotationGuess++;
                 if (clusterRotationGuess > 2) clusterRotationGuess = 0;
                 Console.WriteLine($"Guess tracker rotation: {(clusterRotationGuess == 0 ? "Disabled" : clusterRotationGuess == 1 ? "Enabled" : "CPU Heavy")}");
+            } else if (key == ConsoleKey.Divide) {
+                KeyReleased();
+            }
+            if (virtualRightHandIndex != -1) {
+                if (key == ConsoleKey.NumPad0)
+                    oscClient.Send("/VMT/Input/Button", virtualRightHandIndex, 0, 0f, 1);
+                else if (key == ConsoleKey.NumPad1)
+                    oscClient.Send("/VMT/Input/Button", virtualRightHandIndex, 1, 0f, 1);
+                else if (key == ConsoleKey.NumPad3)
+                    oscClient.Send("/VMT/Input/Button", virtualRightHandIndex, 2, 0f, 1);
+                else if (key == ConsoleKey.NumPad5)
+                    oscClient.Send("/VMT/Input/Button", virtualRightHandIndex, 3, 0f, 1);
+                else if (key == ConsoleKey.NumPad7)
+                    oscClient.Send("/VMT/Input/Button", virtualRightHandIndex, 4, 0f, 1);
+                else if (key == ConsoleKey.Multiply)
+                    oscClient.Send("/VMT/Input/Trigger", virtualRightHandIndex, 0, 0f, 1f);
+                else if (key == ConsoleKey.NumPad9)
+                    oscClient.Send("/VMT/Input/Trigger", virtualRightHandIndex, 1, 0f, 1f);
+                else if (key == ConsoleKey.NumPad2)
+                    oscClient.Send("/VMT/Input/Joystick", virtualRightHandIndex, 0, 0f, 0f, 1f);
+                else if (key == ConsoleKey.NumPad8)
+                    oscClient.Send("/VMT/Input/Joystick", virtualRightHandIndex, 0, 0f, 0f, -1f);
+                else if (key == ConsoleKey.NumPad4)
+                    oscClient.Send("/VMT/Input/Joystick", virtualRightHandIndex, 0, 0f, -1f, 0f);
+                else if (key == ConsoleKey.NumPad6)
+                    oscClient.Send("/VMT/Input/Joystick", virtualRightHandIndex, 0, 0f, 1f, 0f);
             }
             offsetMat.M41 = offsetMat.M41 + roomOffset.X;
             offsetMat.M42 = offsetMat.M42 + roomOffset.Y;

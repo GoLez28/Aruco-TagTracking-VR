@@ -53,6 +53,14 @@ namespace TagTracking {
             public float rightElbowtrackerFollowWeight = 0.0f;
             public float leftElbowtrackerFollowWeight = 0.0f;
 
+            public bool isHead = false;
+            public bool isLeftHand = false;
+            public bool isRightHand = false;
+            public Vector3 positionOffset = new();
+
+            public string anchorTracker = "";
+            public Vector3? defaultPose = null;//if null, try to follow last position
+
             public ClusterTracker(string name, int[] ids, Vector3[] ofss, Vector3[] rots) {
                 trackerName = name;
                 trackerIndex = ids;
@@ -124,7 +132,7 @@ namespace TagTracking {
                 Vector3[] estimatedPos, poss;
                 Vector3[] estimatedPos0;
                 List<List<Quaternion>> posibleRotsCount;
-                Quaternion[] estimatedRot;
+                Quaternion[] estimatedRot, rots;
                 List<List<int>> posibleRotsCountId;
                 int actualAvailableTrackers = 0, maxId;
                 for (int i = 0; i < updateCount.Length; i++) {
@@ -191,7 +199,7 @@ namespace TagTracking {
                 int[] getCornerEx = getCorner;// new int[] { getCorner[0], getCorner[0], getCorner[1], getCorner[1], getCorner[2], getCorner[2], getCorner[3], getCorner[3] };
                 //set first guess
                 InitializeValues(cams, getCornerEx, out trackersMat, out trackerRotationsMat, out trackerOffsetsMat, out trackerStraightness);
-                GetFinalCenteredPositions(true, cams, trackersMat, trackerRotationsMat, trackerOffsetsMat, trackerStraightness, out estimatedPos0, out estimatedRot, out posibleRotsCount, out posibleRotsCountId, out maxId, out poss);
+                GetFinalCenteredPositions(true, cams, trackersMat, trackerRotationsMat, trackerOffsetsMat, trackerStraightness, out estimatedPos0, out estimatedRot, out posibleRotsCount, out posibleRotsCountId, out maxId, out poss, out rots);
                 float centerDistance = GetAveragePositionDifference(poss, estimatedPos0, updateCount);
                 if (centerDistance < bestDistance) {
                     bestDistance = centerDistance;
@@ -246,7 +254,7 @@ namespace TagTracking {
                             persw.Start();
                             calcCount++;
                             InitializeValues(cams, getCornerEx, out trackersMat, out trackerRotationsMat, out trackerOffsetsMat, out trackerStraightness);
-                            GetFinalCenteredPositions(false, cams, trackersMat, trackerRotationsMat, trackerOffsetsMat, trackerStraightness, out estimatedPos, out estimatedRot, out posibleRotsCount, out posibleRotsCountId, out maxId, out poss);
+                            GetFinalCenteredPositions(false, cams, trackersMat, trackerRotationsMat, trackerOffsetsMat, trackerStraightness, out estimatedPos, out estimatedRot, out posibleRotsCount, out posibleRotsCountId, out maxId, out poss, out rots);
                             centerDistance = GetAveragePositionDifference(poss, estimatedPos0, updateCount);
                             if (centerDistance < bestDistance && !first) {
                                 bestDistance = centerDistance;
@@ -273,7 +281,7 @@ namespace TagTracking {
                 }
                 //bestCorner = new int[] { 3, 2, -1, -1 };
                 InitializeValues(cams, bestCorner, out trackersMat, out trackerRotationsMat, out trackerOffsetsMat, out trackerStraightness);
-                GetFinalCenteredPositions(true, cams, trackersMat, trackerRotationsMat, trackerOffsetsMat, trackerStraightness, out estimatedPos, out estimatedRot, out posibleRotsCount, out posibleRotsCountId, out maxId, out poss);
+                GetFinalCenteredPositions(true, cams, trackersMat, trackerRotationsMat, trackerOffsetsMat, trackerStraightness, out estimatedPos, out estimatedRot, out posibleRotsCount, out posibleRotsCountId, out maxId, out poss, out rots);
                 //if (trackerName.Equals("leftfoot")) Console.WriteLine($"Best:\t{bestCorner[0]}\t/\t{bestCorner[1]}\t/\t{bestCorner[2]}\t/\t{bestCorner[3]}\t - {centerDistance}");
                 //if (trackerName.Equals("leftfoot"))
                 //System.Threading.Thread.Sleep(100);
@@ -318,8 +326,12 @@ namespace TagTracking {
                         for (int j = 0; j < cameras.Length; j++) {
                             int v = i * cameras.Length + j;
                             if (updateCount[v] > 3) continue;
-                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 0, poss[v].X, poss[v].Z, poss[v].Y);
-                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 1, estimatedPos0[v].X, estimatedPos0[v].Z, estimatedPos0[v].Y);
+                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 0, 
+                                poss[v].X, poss[v].Z, poss[v].Y,
+                                -rots[v].X, -rots[v].Z, -rots[v].Y, rots[v].W);
+                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 1, 
+                                estimatedPos[v].X, estimatedPos[v].Z, estimatedPos[v].Y, 
+                                -estimatedRot[v].X, -estimatedRot[v].Z, -estimatedRot[v].Y, estimatedRot[v].W);
                         }
                     }
                 }
@@ -375,7 +387,7 @@ namespace TagTracking {
                     for (int i = 0; i < trackerPresenceRots.Length; i++) {
                         int index = posibleRotsCountId[maxId][i];
                         if (index == -1) {
-                            trackerPresenceRots[i] = 50;
+                            trackerPresenceRots[i] = 75;
                         } else
                             trackerPresenceRots[i] = trackerPresence[posibleRotsCountId[maxId][i]];
                     }
@@ -496,7 +508,7 @@ namespace TagTracking {
                 return centerDistance;
             }
 
-            private void GetFinalCenteredPositions(bool final, int cams, Matrix4x4[] trackersMat, Matrix4x4[] trackerRotationsMat, Matrix4x4[] trackerOffsetsMat, float[] trackerStraightness, out Vector3[] estimatedPos, out Quaternion[] estimatedRot, out List<List<Quaternion>> posibleRotsCount, out List<List<int>> posibleRotsCountId, out int maxId, out Vector3[] poss) {
+            private void GetFinalCenteredPositions(bool final, int cams, Matrix4x4[] trackersMat, Matrix4x4[] trackerRotationsMat, Matrix4x4[] trackerOffsetsMat, float[] trackerStraightness, out Vector3[] estimatedPos, out Quaternion[] estimatedRot, out List<List<Quaternion>> posibleRotsCount, out List<List<int>> posibleRotsCountId, out int maxId, out Vector3[] poss, out Quaternion[] rots) {
                 estimatedPos = new Vector3[trackers.Length * cams];
                 estimatedRot = new Quaternion[trackers.Length * cams];
                 Vector3 availableAvgPos = new();
@@ -507,6 +519,7 @@ namespace TagTracking {
                 posibleRotsCount = new List<List<Quaternion>>();
                 posibleRotsCountId = new List<List<int>>();
                 poss = new Vector3[estimatedPos.Length];
+                rots = new Quaternion[estimatedRot.Length];
                 maxId = -1;
                 if (lastRotCount < 2) { //add previous rotation
                     posibleRots.Add(prevRot);
@@ -732,8 +745,6 @@ namespace TagTracking {
                 //        estimatedRot[i] = filteredRot;
                 //    }
 
-                Quaternion[] rots = new Quaternion[estimatedRot.Length];
-
                 //GET CENTERED TRACKERS MATRIX
                 for (int i = 0; i < estimatedPos.Length; i++) {
                     Matrix4x4 mat = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(estimatedRot[i]), Matrix4x4.CreateTranslation(estimatedPos[i]));
@@ -750,7 +761,7 @@ namespace TagTracking {
                             Matrix4x4 dir = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(-0.25f, 0, 0)), Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(rots[i]), Matrix4x4.CreateTranslation(poss[i])));
                             Vector3 dirV = dir.Translation;
                             int id = trackerIndex[i / cameras.Length];
-                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 2, dirV.X, dirV.Z, dirV.Y);
+                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 2, dirV.X, dirV.Z, dirV.Y, 0, 0, 0, 1);
                         }
                     }
                     //Aruco.DrawAxis(Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(rots[i]), Matrix4x4.CreateTranslation(poss[i])));

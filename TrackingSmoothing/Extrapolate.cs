@@ -123,7 +123,7 @@ namespace TagTracking {
                     if (Program.debugShowCamerasPosition && Program.debugTrackerToBorrow == i) continue;
                     (Vector3 pos, Quaternion q) = trackers[i].GetEstimatedPosition();
                     Matrix4x4 preSmooth = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(q), Matrix4x4.CreateTranslation(pos));
-                    preSmooth = Tag.GetOffsetTracker(preSmooth, Tag.trackers[i].trackerFollowWeight, !trackers[i].notSeen, Tag.trackers[i].leftElbowtrackerFollowWeight, Tag.trackers[i].rightElbowtrackerFollowWeight);
+                    preSmooth = Tag.GetOffsetTracker(Tag.trackers[i].trackerName, preSmooth, Tag.trackers[i].trackerFollowWeight, !trackers[i].notSeen, Tag.trackers[i].leftElbowtrackerFollowWeight, Tag.trackers[i].rightElbowtrackerFollowWeight);
                     pos = preSmooth.Translation;
                     q = Quaternion.CreateFromRotationMatrix(preSmooth);
                     //Quaternion q = trackers[i].rotation;

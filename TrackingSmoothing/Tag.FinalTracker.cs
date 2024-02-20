@@ -44,13 +44,13 @@ namespace TagTracking {
             }
 
             public void Update() {
+                pfpos = fpos;
+                pfrot = frot;
                 if (Program.postNoise == 0) {
                     fpos = pos;
                     frot = rot;
                     return;
                 }
-                pfpos = fpos;
-                pfrot = frot;
 
                 //filter rotation spikes
                 rotList.Insert(0, rot);

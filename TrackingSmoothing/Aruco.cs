@@ -305,6 +305,7 @@ namespace TagTracking {
                         } else
                             break;
                     }
+                    frame.Dispose();
                     Tag.cameras[c].skipFrameCount++;
                     System.Threading.Thread.Sleep(4);
                 }
