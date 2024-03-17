@@ -4,7 +4,7 @@ pero solo utiliza una camara
 Empezando, debes instalar un driver para steamvr, que permitira que el tracker sea detectado por steamvr,  
 debes instalar VMT https://github.com/gpsnmeajp/VirtualMotionTracker/releases/tag/v0.15 , el instalador es bastante facil de usar,  
 una vez instalado no se necesita hacer nada mas (eso creo) (tambien puedas usar el tracking nativo de VRChat por OSC activando la opcion useVrchatOscTrackers=true, pero recomiendo VMT).
-Despues, vas a tener que descargar mi programa https://github.com/GoLez28/Aruco-TagTracking-VR/releases/latest, cuando lo abras por primera vez, se generara el archivo "arucotags.png" al lado del .exe,  
+Despues, vas a tener que descargar mi programa https://github.com/GoLez28/Aruco-TagTracking-VR/releases/latest, para que pueda correr necesitas el entorno dotnet core 5 https://dotnet.microsoft.com/es-es/download/dotnet/5.0 ahi descargas el entorno de ejecucion de escritorio, cuando abras la aplicacion por primera vez, se generara el archivo "arucotags.png" al lado del .exe,  
 <img src="https://raw.githubusercontent.com/GoLez28/TagTracking/master/tutorial/arucoboard.png" width="200">   
 esto es lo que vas a tener que imprimir, pero solo lo que necesites, por ejemplo si vas a usar 4 para el pie derecho, 4 para el izquierdo y 6 para la cintura,  
 necesitaras 14 en total, lo demas va a ser innecesario.
