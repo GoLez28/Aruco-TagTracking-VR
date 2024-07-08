@@ -30,6 +30,4 @@ example in the files
 
 all the variables that config has: https://github.com/GoLez28/Aruco-TagTracking-VR/blob/master/tutorial/config_en.md
 
-
-https://github.com/GoLez28/TagTracking/assets/15484340/968b5222-90e1-4f15-a05d-14d728cc2c7a
-
+https://github.com/GoLez28/Aruco-TagTracking-VR/assets/15484340/180fe830-6b54-4025-9394-aa2826f34b8b
