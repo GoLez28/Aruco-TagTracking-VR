@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Drawing;
+using Emgu.CV.Cuda;
 using Emgu.CV; // the mom
 using Emgu.CV.Aruco; // the hero
 using Emgu.CV.CvEnum; // the book
@@ -11,6 +12,8 @@ using Emgu.CV.Structure; // the storage
 using Emgu.CV.Util; // the side kick
 using System.Numerics;
 using System.Runtime.InteropServices;
+using uOSC;
+using System.Runtime.CompilerServices;
 
 namespace TagTracking {
     class Aruco {
@@ -49,6 +52,7 @@ namespace TagTracking {
         public static List<(int, int)> perMarkerLength = new List<(int, int)>();
         public static Mat[] cameraMatrix;
         public static Mat[] distortionMatrix;
+        public static Vector2[] cameraResolution;
 
         public static bool useSmoothCorners = true;
         public static float cornersMaxDistance = 1;
@@ -62,6 +66,8 @@ namespace TagTracking {
         public static bool recoverRejecteds = true;
         public static bool showRejected = true;
         public static float rejectedDistanceTolerance = 5;
+        public static bool hasCUDA = false;
+        public static Vector2[] cameraFrameResolutions;
         //static Bitmap whiteLogo;
         //static Bitmap blackLogo;
         //static double[,,] whiteLogoGamma = new double[250, 100, 3];
@@ -69,16 +75,29 @@ namespace TagTracking {
         //static double[] byte2floatGamma = new double[256];
         //static byte[] float2byteGamma = new byte[256];
         public static void Init() {
+            if (Program.useCUDA) {
+                try {
+                    if (CudaInvoke.HasCuda)
+                        hasCUDA = true;
+                } catch (Exception ex) {
+                    Console.WriteLine("CUDA is not available: " + ex.Message);
+                    return;
+                }
+            }
+
+
             queueCount = new int[Tag.cameras.Length];
             sclQueue = new float[Tag.cameras.Length][];
             posQueue = new VectorOfDouble[Tag.cameras.Length][];
             rotQueue = new VectorOfDouble[Tag.cameras.Length][];
+            typeQueue = new Draw.ShapeType[Tag.cameras.Length][];
             ArucoDict = new Dictionary(Dictionary.PredefinedDictionaryName.Dict4X4_50); // bits x bits (per marker) _ number of markers in dict
             GetDictionary();
             for (int i = 0; i < Tag.cameras.Length; i++) {
                 sclQueue[i] = new float[maxQueue];
                 posQueue[i] = new VectorOfDouble[maxQueue];
                 rotQueue[i] = new VectorOfDouble[maxQueue];
+                typeQueue[i] = new Draw.ShapeType[maxQueue];
             }
             betterRects = new RectEx[Tag.cameras.Length][];
             for (int i = 0; i < betterRects.Length; i++) {
@@ -216,6 +235,7 @@ namespace TagTracking {
         public static void GetCameraParameters() {
             Mat[] newCameraMatrix = new Mat[Tag.cameras.Length];
             Mat[] newDistortionMatrix = new Mat[Tag.cameras.Length];
+            Vector2[] newCameraResolution = new Vector2[Tag.cameras.Length];
             for (int i = 0; i < Tag.cameras.Length; i++) {
                 newCameraMatrix[i] = new Mat(new Size(3, 3), DepthType.Cv32F, 1);
                 newDistortionMatrix[i] = new Mat(1, 8, DepthType.Cv32F, 1);
@@ -235,9 +255,21 @@ namespace TagTracking {
                 }
                 fs["cameraMatrix"].ReadMat(newCameraMatrix[c]);
                 fs["dist_coeffs"].ReadMat(newDistortionMatrix[c]);
+                string getRes = fs["cameraResolution"].ReadString();
+                if (getRes.Equals("")) continue;
+                string[] parts = getRes.Split(' ');
+                if (parts.Length != 2) continue;
+                int w = int.Parse(parts[0]);
+                int h = int.Parse(parts[1]);
+                newCameraResolution[c] = new Vector2(w, h);
             }
             cameraMatrix = newCameraMatrix;
             distortionMatrix = newDistortionMatrix;
+            cameraResolution = newCameraResolution;
+            cameraFrameResolutions = new Vector2[Tag.cameras.Length];
+            for (int i = 0; i < cameraFrameResolutions.Length; i++) {
+                cameraFrameResolutions[i] = new();
+            }
         }
 
         static float smoothbenchmark = 0;
@@ -246,6 +278,10 @@ namespace TagTracking {
             VectorOfVectorOfPointF corners = new VectorOfVectorOfPointF(); // corners of the detected marker
             VectorOfVectorOfPointF rejected = new VectorOfVectorOfPointF(); // rejected contours
             try {
+                if (width + x > frame.Width) width = frame.Width - x;
+                if (height + y > frame.Height) height = frame.Height - y;
+                if (x < 0) x = 0;
+                if (y < 0) y = 0;
                 Mat roi = new Mat(frame, new Rectangle(x, y, width, height));
                 ArucoInvoke.DetectMarkers(roi, ArucoDict, corners, ids, ArucoParameters, rejected);
                 //Mat show = new Mat(roi, new Rectangle(0, 0, frame.Width, frame.Height));
@@ -282,6 +318,12 @@ namespace TagTracking {
                 arucoThreadIdleBenchmark.Start();
                 while (true) {
                     frame = capture[c].QueryFrame();
+                    if (frame.Width != Tag.cameras[c].width || frame.Height != Tag.cameras[c].height) {
+                        if (!Tag.cameras[c].isResolutionIncorrect && Program.frameCount > 10) {
+                            Tag.cameras[c].isResolutionIncorrect = !Tag.cameras[c].isResolutionIncorrect;
+                            Console.WriteLine($"Incorrect resolution at camera {c}!\nExpected: {Tag.cameras[c].width}/{Tag.cameras[c].height}\nRecieved: {frame.Width}/{frame.Height}");
+                        }
+                    }
                     int skipFrames = Tag.cameras[c].skipFrames;
                     if (Program.performanceMode) {
                         if (skipFrames == 0) skipFrames = 1;
@@ -356,13 +398,14 @@ namespace TagTracking {
                         continue;
                     }
                 }
-                //if (c == 0)
-                //    frame = new Mat(@"C:\Users\\Videos\iVCam\.jpg");
+                if (c == 0)
+                    frame = new Mat(@"C:\Users\GoLez\Videos\iVCam\#1_20241119212405.jpg");
                 //if (c == 1
                 //    frame = new Mat(@"C:\Users\\Videos\iVCam\.jpg");
                 if (frame == null)
                     Console.WriteLine($"Wrong video input!!! (cam: {c})");
                 if (frame != null && !frame.IsEmpty) {
+                    cameraFrameResolutions[c] = new Vector2(frame.Width, frame.Height);
                     //Detect markers on last retrieved frame
                     VectorOfInt ids = new VectorOfInt(); // name/id of the detected markers
                     VectorOfVectorOfPointF corners = new VectorOfVectorOfPointF(); // corners of the detected marker
@@ -371,17 +414,22 @@ namespace TagTracking {
                     bool halfFrame = useDynamicFraming && frameCount % 6 != 0;
                     halfFrame &= !(TrackerCalibrate.startCalibrating || CameraCalibrate.startCalibrating || RoomCalibrate.getRawTrackersStep > -1);
                     halfFrame &= !Tag.cameras[c].inWaitMode;
+                    float newXr = cameraResolution[c].X == 0 ? xRatio : (xRatio / (frame.Width / cameraResolution[c].X));
+                    float newYr = cameraResolution[c].Y == 0 ? yRatio : (yRatio / (frame.Height / cameraResolution[c].Y));
                     if (!halfFrame) {
                         ArucoInvoke.DetectMarkers(frame, ArucoDict, corners, ids, ArucoParameters, rejected);
                     } else {
                         List<(int x, int y, int w, int h)> rects;
-                        GetFrameRectangle(frame, c, (int)(frame.Width * xRatio), (int)(frame.Height * yRatio), out rects);
+                        GetFrameRectangle(frame, c, (int)(frame.Width * newXr), (int)(frame.Height * newYr), out rects);
                         int numTasks = rects.Count;
                         Task<(VectorOfInt, VectorOfVectorOfPointF, VectorOfVectorOfPointF)>[] tasks = new Task<(VectorOfInt, VectorOfVectorOfPointF, VectorOfVectorOfPointF)>[numTasks];
                         if (numTasks > 0) {
                             for (int i = 0; i < numTasks; i++) {
                                 int taskId = i;
                                 (int x, int y, int width, int height) = rects[i];
+                                if (x < 0 || width < 0) {
+                                    Console.WriteLine();
+                                }
                                 if (correctRes) {
                                     x = (int)(x / xRatio);
                                     width = (int)(width / xRatio);
@@ -441,7 +489,7 @@ namespace TagTracking {
                         //corners = SkewRects(c, ids, corners, 2, -1);
                         if (shouldShowFrame)
                             ArucoInvoke.DrawDetectedMarkers(frame, corners, ids, new MCvScalar(255, 0, 255));
-                        corners = AdjustDetectedRectsToLowRes(corners, xRatio, yRatio);
+                        corners = AdjustDetectedRectsToLowRes(corners, newXr, newYr);
 
                         //Estimate pose for each marker using camera calibration matrix and distortion coefficents
                         Mat rvecs = new Mat(); // rotation vector
@@ -480,6 +528,9 @@ namespace TagTracking {
                         CvInvoke.WaitKey(1);
                     }
                     frame.Dispose();
+                    if (Program.updateOnNewFrame) {
+                        Program.ApplyTick();
+                    }
                 }
                 Tag.cameras[c].newData = true;
                 Tag.newInfoReady = true;
@@ -579,7 +630,7 @@ namespace TagTracking {
                         if (Math.Abs(rects[i][step].X - prevCorners[j][k].X) < rejectedDistanceTolerance && Math.Abs(rects[i][step].Y - prevCorners[j][k].Y) < rejectedDistanceTolerance) {
                             order[k] = step;
                             step++;
-                            if (step == 4) 
+                            if (step == 4)
                                 break;
                             k = -1;
                         }
@@ -725,7 +776,15 @@ namespace TagTracking {
                         pos /= m;
                     }
                     //if (!Tag.newInfoReady)
-                    Tag.RecieveTrackerAsync(ids[i], c, rot, pos, altCorner);
+                    //if (ids[i] != 18 || (Program.timer.ElapsedMilliseconds / 1000) % 2 == 0) {
+                        Tag.RecieveTrackerAsync(ids[i], c, rot, pos, altCorner);
+                    //}
+                    //if (ids[i] == 18) {
+                    //    if ((Program.timer.ElapsedMilliseconds / 1000) % 2 == 0)
+                    //        Console.WriteLine("aaa");
+                    //    else 
+                    //        Console.WriteLine("   ");
+                    //}
                     //Console.WriteLine($"{c} - {i} = {pos.X}\t{pos.Y}\t{pos.Z}");
                     pos.Y -= 0.1f;
                     Matrix4x4 finalMat = Matrix4x4.Multiply(rot, Matrix4x4.CreateTranslation(pos));

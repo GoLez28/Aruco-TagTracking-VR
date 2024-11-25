@@ -17,6 +17,7 @@ using Emgu.CV.DepthAI;
 using Emgu.CV.Ocl;
 using Emgu.CV.PpfMatch3d;
 using static Emgu.Util.Platform;
+using Emgu.CV.Reg;
 
 namespace TagTracking {
     class Program {
@@ -74,8 +75,10 @@ namespace TagTracking {
         public static bool isRotateKeyPressed = false;
         public static bool wantToCloseWindows = false;
         public static int updateFPS = 80;
+        public static bool useCUDA = true;
         public static int interpolationTPS = 80;
         public static bool useInterpolation = true;
+        public static bool updateOnNewFrame = true;
         public static bool performanceMode = false;
         public static float performanceUnderSample = 1.2f;
         private static bool autoActivatePerformanceMode = false;
@@ -105,6 +108,8 @@ namespace TagTracking {
         public static bool showThreadsMS = false;
         public static double[] threadsWorkTime = new double[4];
         public static double[] threadsIdleTime = new double[4];
+
+        static bool selfReport = true;
 
         static void Main(string[] args) {
             /////////////////////////////////////////////////
@@ -162,6 +167,13 @@ namespace TagTracking {
             }
             interpolationThread = new System.Threading.Thread(() => Extrapolate.UpdateLoop());
             interpolationThread.Start();
+            System.Threading.Thread.Sleep(100);
+            if (selfReport) {
+                selfReport = false;
+                for (int i = 0; i < Tag.cameras.Length; i++) {
+                    Console.WriteLine($"cam {i}: {Aruco.cameraFrameResolutions[i].X} / {Aruco.cameraFrameResolutions[i].Y}");
+                }
+            }
 #if DEBUG
             debugSendTrackerOSC = true;
             if (debugSendTrackerOSC) {
@@ -260,7 +272,33 @@ namespace TagTracking {
                     prevCont = m2;
                 }
             }
+            if (!updateOnNewFrame) {
+                ApplyTick();
+            }
+            mainThreadBenchmark.Stop();
+            threadsWorkTime[0] = mainThreadBenchmark.Elapsed.TotalMilliseconds;
+            mainThreadBenchmark.Restart();
+            //A mimir, wait for next frame (80fps)
+            bool ActiveCams = false;
+            for (int i = 0; i < Tag.cameras.Length; i++) {
+                if (!Tag.cameras[i].inWaitMode) {
+                    ActiveCams = true;
+                    break;
+                }
+            }
+            int sleepTime = 1000 / updateFPS;
+            if (!ActiveCams) sleepTime *= 4;
+            System.Threading.Thread.Sleep(sleepTime);
+            mainThreadBenchmark.Stop();
+            threadsIdleTime[0] = mainThreadBenchmark.Elapsed.TotalMilliseconds;
 
+            var mm = devPos[3].mDeviceToAbsoluteTracking;
+            frameCount++;
+
+            return previousTime;
+        }
+
+        public static void ApplyTick() {
             Matrix4x4 hmdRotMat, hmdCentered;
             Vector3 hmdPosV3;
             GetDevices(out hmdRotMat, out hmdCentered, out hmdPosV3);
@@ -337,28 +375,8 @@ namespace TagTracking {
             if (needsToSearchHands) {
                 SetDefaultPose(hmdCentered);
             }
-            mainThreadBenchmark.Stop();
-            threadsWorkTime[0] = mainThreadBenchmark.Elapsed.TotalMilliseconds;
-            mainThreadBenchmark.Restart();
-            //A mimir, wait for next frame (80fps)
-            bool ActiveCams = false;
-            for (int i = 0; i < Tag.cameras.Length; i++) {
-                if (!Tag.cameras[i].inWaitMode) {
-                    ActiveCams = true;
-                    break;
-                }
-            }
-            int sleepTime = 1000 / updateFPS;
-            if (!ActiveCams) sleepTime *= 4;
-            System.Threading.Thread.Sleep(sleepTime);
-            mainThreadBenchmark.Stop();
-            threadsIdleTime[0] = mainThreadBenchmark.Elapsed.TotalMilliseconds;
-
-            var mm = devPos[3].mDeviceToAbsoluteTracking;
-            frameCount++;
-
-            return previousTime;
         }
+
         public static void GetDevices() {
             GetDevices(out Matrix4x4 a, out Matrix4x4 b, out Vector3 c);
         }
@@ -372,6 +390,7 @@ namespace TagTracking {
             }
             hmdCentered = hmdRotMat;
             hmdCentered = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, 0f, 0.09f)), hmdCentered);
+            hmdCentered = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0f, -0.09f, 0f)), hmdCentered);
             hmdPosV3 = hmdCentered.Translation;
             hmdPos[0] = hmdPosV3.X;
             hmdPos[1] = hmdPosV3.Y;
@@ -568,11 +587,32 @@ namespace TagTracking {
                 for (int i = 0; i < threadsWorkTime.Length; i++) {
                     Console.WriteLine();
                 }
-            Console.WriteLine($"\n[Space] Show Hints\n[D1] Calibrate Camera Room Positions\n[D2] Manual Offset Adjust: {Show(adjustOffset)}\n[D3] Calibrate Trackers: {Show(TrackerCalibrate.onCalibration)}\n[D4] Calibrate Cameras (Distortion): {Show(CameraCalibrate.onCalibration)}\n[D5] Auto Adjust Offsets" +
-                $"\n[J] Reload Offsets\n[L] Reloaded Config/Trackers\n[D6] Show Cameras as Tracker 0: {Show(debugShowCamerasPosition)}\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}\n[D8] Reset Trackers (VMT)\n[D9] Show Camera Windows\n[D0] Clear Console" +
-                $"\n[M] Pre-Pose Noise Reduction: {(preNoise == Tag.PreNoise.Disabled ? "Disabled" : preNoise == Tag.PreNoise.DisabledSmooth ? "Disabled + Smooth rects" : preNoise == Tag.PreNoise.EnabledSmooth ? "Enabled + Smooth rects" : "Enabled")}\n[N] Post-Pose Noise Reduction: {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}\n[B] Tracker Center Guessing: {(clusterRotationGuess == 0 ? "Disabled" : clusterRotationGuess == 1 ? "Enabled" : "CPU Heavy")}" +
-                $"\n[H] Enable Performance Mode: {Show(performanceMode)}\n[G] Use Dynamic Framing: {Show(Aruco.useDynamicFraming)}\n[U] Reset Default Pose" +
-                $"\n[Q]-[W] X: {offset.X}\n[A]-[S] Y: {offset.Y}\n[Z]-[X] Z: {offset.Z}\n[E]-[R] Yaw\n[D]-[F] Pitch\n[C]-[V] Roll");
+            Console.WriteLine($"" +
+                $"\n[Space] Show Hints" +
+                $"\n[D1] Calibrate Camera Room Positions" +
+                $"\n[D2] Manual Offset Adjust: {Show(adjustOffset)}" +
+                $"\n[D3] Calibrate Trackers: {Show(TrackerCalibrate.onCalibration)}" +
+                $"\n[D4] Calibrate Cameras (Distortion): {Show(CameraCalibrate.onCalibration)}" +
+                $"\n[D5] Auto Adjust Offsets" +
+                $"\n[J] Reload Offsets" +
+                $"\n[L] Reloaded Config/Trackers" +
+                $"\n[D6] Show Cameras as Tracker 0: {Show(debugShowCamerasPosition)}" +
+                $"\n[D7] Send Debug Trackers: {Show(debugSendTrackerOSC)}" +
+                $"\n[D8] Reset Trackers (VMT)" +
+                $"\n[D9] Show Camera Windows" +
+                $"\n[D0] Clear Console" +
+                $"\n[M] Pre-Pose Noise Reduction: {(preNoise == Tag.PreNoise.Disabled ? "Disabled" : preNoise == Tag.PreNoise.DisabledSmooth ? "Disabled + Smooth rects" : preNoise == Tag.PreNoise.EnabledSmooth ? "Enabled + Smooth rects" : "Enabled")}" +
+                $"\n[N] Post-Pose Noise Reduction: {(postNoise == 0 ? "Disabled" : postNoise == 1 ? "Enabled" : "Partial")}" +
+                $"\n[B] Tracker Center Guessing: {(clusterRotationGuess == 0 ? "Disabled" : clusterRotationGuess == 1 ? "Enabled" : "CPU Heavy")}" +
+                $"\n[H] Enable Performance Mode: {Show(performanceMode)}" +
+                $"\n[G] Use Dynamic Framing: {Show(Aruco.useDynamicFraming)}" +
+                $"\n[U] Reset Default Pose" +
+                $"\n[Q]-[W] X: {offset.X}" +
+                $"\n[A]-[S] Y: {offset.Y}" +
+                $"\n[Z]-[X] Z: {offset.Z}" +
+                $"\n[E]-[R] Yaw" +
+                $"\n[D]-[F] Pitch" +
+                $"\n[C]-[V] Roll");
             if (ovrNotFound) {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"OVR not initialized, Restart app");
@@ -739,11 +779,7 @@ namespace TagTracking {
                     }
                 }
             } else if (key == ConsoleKey.L) {
-                ReadConfig();
-                Tag.ReadTrackers();
-                Console.WriteLine($"Reloaded Config / Trackers");
-                ApplyOffset();
-                LoadOffsets();
+                RestartTrackers();
             } else if (key == ConsoleKey.K) {
                 var info = new System.Diagnostics.ProcessStartInfo(Environment.GetCommandLineArgs()[0]);
                 System.Diagnostics.Process.Start("TagTracking.exe");
@@ -830,6 +866,14 @@ namespace TagTracking {
                 sw.WriteLine(offsetMat.M43);
                 sw.WriteLine(offsetMat.M44);
             }
+        }
+
+        public static void RestartTrackers() {
+            ReadConfig();
+            Tag.ReadTrackers();
+            Console.WriteLine($"Reloaded Config / Trackers");
+            ApplyOffset();
+            LoadOffsets();
         }
 
         private static string Show(bool b) {
@@ -978,6 +1022,8 @@ namespace TagTracking {
                 else if (split[0].Equals("refineSearch")) RoomCalibrate.refineSearch = split[1].Equals("true");
                 else if (split[0].Equals("showThreadsTime")) showThreadsMS = split[1].Equals("true");
                 else if (split[0].Equals("refineIterations")) RoomCalibrate.refineIterations = int.Parse(split[1]);
+                else if (split[0].Equals("tagStraightnessThreshold")) Tag.tagStraightnessThreshold = float.Parse(split[1], any, invariantCulture);
+                else if (split[0].Equals("ticksToFadeTag")) Tag.ticksToFadeTag = int.Parse(split[1]);
                 else if (split[0].Equals("dynamicFiltering")) Tag.dynamicFiltering = split[1].Equals("true");
                 else if (split[0].Equals("dynamicFraming")) Aruco.useDynamicFraming = split[1].Equals("true");
                 else if (split[0].Equals("markerDictionary")) Aruco.markerDictionary = split[1].ToLower();
@@ -985,6 +1031,7 @@ namespace TagTracking {
                 else if (split[0].Equals("autoActivatePerformanceMode")) autoActivatePerformanceMode = split[1].Equals("true");
                 else if (split[0].Equals("showRejected")) Aruco.showRejected = split[1].Equals("true");
                 else if (split[0].Equals("recoverRejected")) Aruco.recoverRejecteds = split[1].Equals("true");
+                else if (split[0].Equals("updateOnNewFrame")) updateOnNewFrame = split[1].Equals("true");
                 else if (split[0].Equals("rejectedDistanceTolerance")) Aruco.rejectedDistanceTolerance = float.Parse(split[1], any, invariantCulture);
                 else if (split[0].Equals("refinementMethod")) {
                     Aruco.refinementMethod = int.Parse(split[1]);

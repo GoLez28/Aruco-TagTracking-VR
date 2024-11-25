@@ -32,14 +32,22 @@ namespace TagTracking {
             public bool allAgreed = false;
             public Matrix4x4 lastSent = new Matrix4x4();
             public void Recieve(int camera, Vector3 pos, Matrix4x4 rot, int altRot) {
+                //int cameraAllowed = (int)(Program.timer.ElapsedMilliseconds / 2000f) % 3;
+                //if (camera != cameraAllowed) return;
+                //Console.WriteLine("recieving " + cameraAllowed);
                 if (altRot != -1) {
                     //FILTER ROTATION FOR ALTERNATES
-                    if (updateCount[camera] > 1) {
-                        singles[camera].altRotList[altRot].Clear();
-                    }
-                    singles[camera].altRotList[altRot].Insert(0, Quaternion.CreateFromRotationMatrix(rot));
-                    if (singles[camera].altRotList[altRot].Count > 10)
-                        singles[camera].altRotList[altRot].RemoveAt(singles[camera].altRotList[altRot].Count - 1);
+                    List<Quaternion>[] altRotList = new List<Quaternion>[singles[camera].altRotList.Length];
+                    for (int i = 0; i < altRotList.Length; i++)
+                        altRotList[i] = new List<Quaternion>(singles[camera].altRotList[i]);
+
+                    if (updateCount[camera] > 1)
+                        altRotList[altRot].Clear();
+                    altRotList[altRot].Insert(0, Quaternion.CreateFromRotationMatrix(rot));
+                    if (altRotList[altRot].Count > 10)
+                        altRotList[altRot].RemoveAt(altRotList[altRot].Count - 1);
+
+                    singles[camera].altRotList = altRotList;
                     List<Quaternion> r1ListAlt = new List<Quaternion>();
                     List<Quaternion> r2ListAlt = new List<Quaternion>();
                     Quaternion lastRot1Alt = singles[camera].altRotList[altRot][0];
@@ -70,13 +78,17 @@ namespace TagTracking {
                 //Aruco.DrawAxis(Matrix4x4.Multiply(rot, Matrix4x4.CreateTranslation(pos)), camera);
 
                 //FILTER DEPTH
+                List<float> zList = new List<float>(singles[camera].zList);
+
                 if (updateCount[camera] > 1) {
-                    singles[camera].zList.Clear();
+                    zList.Clear();
                     trackerPresence[camera] = 0;
                 }
-                singles[camera].zList.Insert(0, pos.Z);
-                if (singles[camera].zList.Count > 10)
-                    singles[camera].zList.RemoveAt(singles[camera].zList.Count - 1);
+                zList.Insert(0, pos.Z);
+                if (zList.Count > 10)
+                    zList.RemoveAt(zList.Count - 1);
+
+                singles[camera].zList = zList;
                 List<float> d1List = new List<float>();
                 List<float> d2List = new List<float>();
                 float lastDepth1 = singles[camera].zList[0];
@@ -107,12 +119,15 @@ namespace TagTracking {
                 //}
 
                 //FILTER ROTATION
-                if (updateCount[camera] > 1) {
-                    singles[camera].rotList.Clear();
-                }
-                singles[camera].rotList.Insert(0, Quaternion.CreateFromRotationMatrix(rot));
-                if (singles[camera].rotList.Count > 10)
-                    singles[camera].rotList.RemoveAt(singles[camera].rotList.Count - 1);
+                List<Quaternion> rotList = new List<Quaternion>(singles[camera].rotList);
+
+                if (updateCount[camera] > 1)
+                    rotList.Clear();
+                rotList.Insert(0, Quaternion.CreateFromRotationMatrix(rot));
+                if (rotList.Count > 10)
+                    rotList.RemoveAt(singles[camera].rotList.Count - 1);
+
+                singles[camera].rotList = rotList;
                 List<Quaternion> r1List = new List<Quaternion>();
                 List<Quaternion> r2List = new List<Quaternion>();
                 Quaternion lastRot1 = singles[camera].rotList[0];
@@ -162,9 +177,6 @@ namespace TagTracking {
                 if (trackerPresence[camera] > 5) {
                     trackerPresence[camera] = 5;
                 }
-                //RESET UPDATE
-                updateCount[camera] = 0;
-                newData[camera] = true;
 
                 //CHECK FOR ROTATION STARIGHTNESS
                 //i dont remember what is this for lol
@@ -192,12 +204,18 @@ namespace TagTracking {
                 Matrix4x4 lookatMat = Matrix4x4.Multiply(rot, Matrix4x4.CreateTranslation(pos));
                 Matrix4x4 moveMat = Matrix4x4.Multiply(Matrix4x4.CreateTranslation(new Vector3(0, 0, pos.Z)), lookatMat);
                 float d = Utils.GetDistance(moveMat.M41, moveMat.M42, moveMat.M43, 0, 0, 0) / pos.Z;
-                d = (float)Math.Pow(d*0.5f, 2);
+                d = (float)Math.Pow(d * 0.5f, 2);
                 trackerStraightness[camera] = d;
-                if (index == 0) {
-                    //Console.WriteLine(d);
-                    //Aruco.DrawAxis(moveMat, camera);
-                }
+                //if (index == 0) {
+                //    Console.WriteLine(d);
+                //    //Aruco.DrawAxis(moveMat, camera);
+                //}
+
+                if (d > tagStraightnessThreshold) return;
+
+                //RESET UPDATE
+                updateCount[camera] = 0;
+                newData[camera] = true;
 
                 //trackerStraightness[camera] = 0;
 

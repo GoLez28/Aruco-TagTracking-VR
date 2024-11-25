@@ -102,7 +102,7 @@ namespace TagTracking {
                 return;
             }
             if (timedSnapshot) {
-                if (Program.timer.ElapsedMilliseconds - lastTimeGetRaw > 3000) {
+                if (Program.timer.ElapsedMilliseconds - lastTimeGetRaw > 500) {
                     addNewRaw = true;
                     lastTimeGetRaw = Program.timer.ElapsedMilliseconds;
                 }

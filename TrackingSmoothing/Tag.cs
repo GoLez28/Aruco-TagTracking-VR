@@ -32,6 +32,7 @@ namespace TagTracking {
             public string file = "";
             public int width = 640;
             public int height = 480;
+            public bool isResolutionIncorrect = false;
             public int rsWidth = 0;
             public int rsHeight = 0;
             public int index = 0;
@@ -140,7 +141,8 @@ namespace TagTracking {
         public static int lastCamera = 0;
         public static int lastIndex = 0;
         public static double[] cameraTPS = new double[2];
-
+        public static int ticksToFadeTag = 50;
+        public static float tagStraightnessThreshold = 0.35f;
 
         public static bool dynamicFiltering = true;
         public static void SaveMatrix() {
@@ -350,7 +352,7 @@ namespace TagTracking {
                             if (rawTrackers[i].updateCount[j] > 2) continue;
                             Vector3 p = poss[j].Translation;
                             Quaternion q = poss[j].Rotation();
-                            Program.oscClientDebug.Send($"/debug/trackers/position", i, j, p.X, p.Z, p.Y, -q.X, -q.Z, -q.Y, q.W);
+                            Program.oscClientDebug.Send($"/debug/trackers/position", i, j, p.X, p.Z, p.Y, -q.X, -q.Z, -q.Y, q.W, 0);
                         }
                     }
                 }
@@ -369,7 +371,7 @@ namespace TagTracking {
                 for (int j = 0; j < poss.Length; j++) {
                     Vector3 p = poss[j].Translation;
                     Quaternion q = poss[j].Rotation();
-                    Program.oscClientDebug.Send($"/debug/trackers/position", i, j, p.X, p.Z, p.Y, -q.X, -q.Z, -q.Y, q.W);
+                    Program.oscClientDebug.Send($"/debug/trackers/position", i, j, p.X, p.Z, p.Y, -q.X, -q.Z, -q.Y, q.W, 0);
                 }
             }
         }
@@ -420,7 +422,7 @@ namespace TagTracking {
             if (camera != lastCamera || (camera == lastCamera && lastIndex >= index)) {
                 double tps = 1000.0 / (Program.timer.Elapsed.TotalMilliseconds - lastFrameTime[camera]);
                 if (tps < 100.0)
-                    cameraTPS[camera] += (tps - cameraTPS[camera]) * 0.5f;
+                    cameraTPS[camera] += (tps - cameraTPS[camera]) * 0.03f;
                 lastFrameTime[camera] = Program.timer.Elapsed.TotalMilliseconds;
             }
             lastCamera = camera;
@@ -604,6 +606,8 @@ namespace TagTracking {
                     nullPos = Matrix4x4.Multiply(nullPos, Program.offsetMat);
                     Vector3 pos = nullPos.Translation;
                     Quaternion q = Quaternion.Identity;
+                    if (float.IsNaN(pos.X))
+                        Program.RestartTrackers();
                     Program.oscClient.Send("/VMT/Room/Unity", t + 1, 1, 0f,
                                                     pos.X, pos.Z, pos.Y, //1f, 1.7f, 1f
                                                     -q.X, -q.Z, -q.Y, q.W); //idk, this works lol //XZYW 2.24

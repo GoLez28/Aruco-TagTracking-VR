@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 
 namespace TagTracking {
@@ -54,15 +55,24 @@ namespace TagTracking {
 
                 //filter rotation spikes
                 rotList.Insert(0, rot);
-                if (rotList.Count > 10)
-                    rotList.RemoveAt(rotList.Count - 1);
+                int tries = 0;
+                while (rotList.Count > 10) {
+                    try {
+                        if (tries > 3) 
+                            break;
+                        rotList.RemoveAt(rotList.Count - 1);
+                    } catch {
+                        tries++;
+                    }
+                }
                 List<Quaternion> r1List = new List<Quaternion>();
                 List<Quaternion> r2List = new List<Quaternion>();
                 Quaternion lastRot = rotList[0];
                 r1List.Add(lastRot);
                 bool switched = false;
-                for (int i = 1; i < rotList.Count; i++) {
-                    Quaternion curRot = rotList[i];
+                Quaternion[] rotListArr = rotList.ToArray();
+                for (int i = 1; i < rotListArr.Length; i++) {
+                    Quaternion curRot = rotListArr[i];
                     float rotDiff = Quaternion.Dot(Quaternion.Inverse(lastRot) * curRot, Quaternion.Identity);
                     if (rotDiff < 0.9f) {
                         switched = !switched;
@@ -77,15 +87,24 @@ namespace TagTracking {
 
                 //filter position spikes
                 posList.Insert(0, pos);
-                if (posList.Count > 10)
-                    posList.RemoveAt(posList.Count - 1);
+                tries = 0;
+                while (posList.Count > 10) {
+                    try {
+                        if (tries > 3)
+                            break;
+                        posList.RemoveAt(posList.Count - 1);
+                    } catch {
+                        tries++;
+                    }
+                }
+                Vector3[] posListArr = posList.ToArray();
                 List<Vector3> p1List = new List<Vector3>();
                 List<Vector3> p2List = new List<Vector3>();
-                Vector3 lastPos = posList[0];
+                Vector3 lastPos = posListArr[0];
                 p1List.Add(lastPos);
                 switched = false;
-                for (int i = 1; i < posList.Count; i++) {
-                    Vector3 curPos = posList[i];
+                for (int i = 1; i < posListArr.Length; i++) {
+                    Vector3 curPos = posListArr[i];
                     float posDist = Utils.GetDistance(lastPos.X, lastPos.Y, lastPos.Z, curPos.X, curPos.Y, curPos.Z);
                     if (posDist > 0.05f) {
                         switched = !switched;

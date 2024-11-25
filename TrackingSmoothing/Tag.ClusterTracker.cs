@@ -1,5 +1,7 @@
-﻿using System;
+﻿using Emgu.CV;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Numerics;
 
 namespace TagTracking {
@@ -26,11 +28,13 @@ namespace TagTracking {
             public Matrix4x4[] prevMat;
 
             public Quaternion prevRot = new Quaternion();
+            public Quaternion prevx2Rot = new Quaternion();
             public Quaternion prevRotFinal = new();
             public Quaternion currentRot = new();
             public Quaternion prevRotRaw = new Quaternion();
             public int lastRotCount = 0;
             public Vector3 prevPos = new Vector3();
+            public Vector3 prevx2Pos = new Vector3();
             public string trackerName = "unknown";
 
             public float avgSmoothDistTrigger = 0.01f; //w 0.05
@@ -151,7 +155,7 @@ namespace TagTracking {
                 //filter repeated rotations
                 for (int i = 0; i < trackers.Length; i++) {
                     for (int j = 0; j < trackers[i].singles.Length; j++) {
-                        if (trackers[i].updateCount[j] > 2) continue;
+                        if (trackers[i].updateCount[j] > 3) continue;
 
                         Matrix4x4 aRot = trackers[i].singles[j].rot;
                         Quaternion qRot = aRot.Rotation();
@@ -226,12 +230,12 @@ namespace TagTracking {
                     if (calcCount > 64) cInc = 2;
                     int pointArr = arrEnd - pointer;
                     while (getCorner[pointArr] > maxVal) {
-                        if (updateCount[pointArr] < 2)
+                        if (updateCount[pointArr] < 3)
                             getCorner[pointArr] = -1;
                         if (pointer < arrEnd) {
                             pointer++;
                             pointArr = arrEnd - pointer;
-                            if (updateCount[pointArr] < 2) {
+                            if (updateCount[pointArr] < 3) {
                                 bool next = false;
                                 do {
                                     getCorner[pointArr] += cInc;
@@ -288,7 +292,7 @@ namespace TagTracking {
                 //Console.WriteLine();
 
                 for (int i = 0; i < updateCount.Length; i++) {
-                    if (updateCount[i] <= 1) {
+                    if (updateCount[i] <= 2) {
                         bool found = false;
                         for (int j = 0; j < posibleRotsCount[maxId].Count; j++) {
                             if (i == posibleRotsCountId[maxId][j]) {
@@ -303,14 +307,18 @@ namespace TagTracking {
                 }
 
                 for (int i = 0; i < estimatedPos0.Length; i++) {
-                    prevMat[i] = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(estimatedRot[i]), Matrix4x4.CreateTranslation(estimatedPos0[i]));
+                    //if (i == 7)
+                    //    Console.WriteLine(estimatedRot[i]);
+                    ////prevMat[i] = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(estimatedRot[i]), Matrix4x4.CreateTranslation(estimatedPos0[i]));
+                    //if (i == 7)
+                    //    Console.WriteLine(prevMat[i].Rotation());
                     //draw current trackers
                     if (!float.IsNaN(estimatedRot[i].X) && !float.IsNaN(estimatedPos0[i].X) && (Program.frameCount / 8) % 1 == 0) {
                         if (updateCount[i] > 3) {
                             if (updateCount[i] < 50)
-                                Aruco.DrawAxisGray(prevMat[i], Utils.GetMap(trackerPresence[i], 0, 100, 1f, 0.2f));
+                                Aruco.DrawAxisGray(prevMat[i], Utils.GetMap(trackerPresence[i], 0, ticksToFadeTag, 1f, 0.2f));
                         } else
-                            Aruco.DrawAxis(prevMat[i], Utils.GetMap(trackerPresence[i], 0, 100, 1f, 0.2f));
+                            Aruco.DrawAxis(prevMat[i], Utils.GetMap(trackerPresence[i], 0, ticksToFadeTag, 1f, 0.2f));
                     }
 
                 }
@@ -325,12 +333,12 @@ namespace TagTracking {
                         int id = trackerIndex[i];
                         for (int j = 0; j < cameras.Length; j++) {
                             int v = i * cameras.Length + j;
-                            if (updateCount[v] > 3) continue;
-                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 0, 
+                            if (updateCount[v] > 200) continue;
+                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 0,
                                 poss[v].X, poss[v].Z, poss[v].Y,
                                 -rots[v].X, -rots[v].Z, -rots[v].Y, rots[v].W);
-                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 1, 
-                                estimatedPos[v].X, estimatedPos[v].Z, estimatedPos[v].Y, 
+                            Program.oscClientDebug.Send($"/debug/predicted/position", id, 1,
+                                estimatedPos[v].X, estimatedPos[v].Z, estimatedPos[v].Y,
                                 -estimatedRot[v].X, -estimatedRot[v].Z, -estimatedRot[v].Y, estimatedRot[v].W);
                         }
                     }
@@ -420,7 +428,9 @@ namespace TagTracking {
 
                 //SET PREVIOUS POS AND ROT
                 prevRotPresence = Quaternion.Normalize(prevRotPresence);
+                prevx2Pos = prevPos;
                 prevPos = avgPosPresence;
+                prevx2Rot = prevRot;
                 prevRot = prevRotPresence;
                 //UPDATE PREVIOUS COUNT
                 if (newInfo) {
@@ -497,10 +507,10 @@ namespace TagTracking {
                 //    centerDistance += Math.Abs(centerPosition.X - poss[i].X) + Math.Abs(centerPosition.Y - poss[i].Y) + Math.Abs(centerPosition.Z - poss[i].Z);
                 //}
                 for (int i = 0; i < poss.Length; i++) {
-                    if (updateCount[i] > 3)
+                    if (updateCount[i] > 4)
                         continue;
                     for (int j = i + 1; j < poss.Length; j++) {
-                        if (updateCount[j] > 3)
+                        if (updateCount[j] > 4)
                             continue;
                         centerDistance += Math.Abs(poss[j].X - poss[i].X) + Math.Abs(poss[j].Y - poss[i].Y) + Math.Abs(poss[j].Z - poss[i].Z);
                     }
@@ -511,9 +521,11 @@ namespace TagTracking {
             private void GetFinalCenteredPositions(bool final, int cams, Matrix4x4[] trackersMat, Matrix4x4[] trackerRotationsMat, Matrix4x4[] trackerOffsetsMat, float[] trackerStraightness, out Vector3[] estimatedPos, out Quaternion[] estimatedRot, out List<List<Quaternion>> posibleRotsCount, out List<List<int>> posibleRotsCountId, out int maxId, out Vector3[] poss, out Quaternion[] rots) {
                 estimatedPos = new Vector3[trackers.Length * cams];
                 estimatedRot = new Quaternion[trackers.Length * cams];
+                Matrix4x4[] estimatedMat = new Matrix4x4[trackers.Length * cams];
                 Vector3 availableAvgPos = new();
                 Vector3 availableAvgPosDiff = new();
                 Quaternion availableAvgRot = Quaternion.Identity;
+                Quaternion availableAvgRotDiff = Quaternion.Identity;
                 int availableCount = 0;
                 List<Quaternion> posibleRots = new List<Quaternion>();
                 posibleRotsCount = new List<List<Quaternion>>();
@@ -554,7 +566,7 @@ namespace TagTracking {
 
                 //CHECK FOR PARS
                 for (int i = 0; i < updateCount.Length; i++) {
-                    if (updateCount[i] <= 1) {
+                    if (updateCount[i] <= 2) {
 
                         Matrix4x4 newMat = trackersMat[i];
                         Quaternion newMatRot = newMat.Rotation();
@@ -628,8 +640,9 @@ namespace TagTracking {
                 }
 
                 //GET DIFFERENCE FROM LAST TIME, AND SET ABSOLUTE FOR TAG SEEN
+                bool first = true;
                 for (int i = 0; i < updateCountCpy.Length; i++) {
-                    if (updateCountCpy[i] <= 1) {
+                    if (updateCountCpy[i] < 2) {
                         Matrix4x4 newMat = trackersMat[i];
                         bool allowTransform = false;
                         if (maxId != -1) {
@@ -645,29 +658,30 @@ namespace TagTracking {
                             Vector3 posDiff = newMatPos - prevMat[i].Translation;
                             availableAvgPosDiff += posDiff;
                             availableAvgPos += newMatPos;
-                            Quaternion rotDiff = newMat.Rotation() * Quaternion.Inverse(prevMat[i].Rotation());
-                            availableAvgRot = Quaternion.Lerp(availableAvgRot, rotDiff, availableCount == 0 ? 1f : 0.5f);
+                            //Quaternion rotDiff = newMat.Rotation() * Quaternion.Inverse(prevMat[i].Rotation());
+                            //availableAvgRot = rotDiff;// first ? rotDiff : Quaternion.Lerp(availableAvgRot, rotDiff, availableCount == 0 ? 1f : 0.5f);
                             availableCount++;
+                            first = false;
                         } else if (final) {
                             for (int j = 0; j < 5; j++) { //rectify filtering
                                 trackersRotationsFilter[i].Filter(estimatedRot[i]);
                             }
                         }
+                        estimatedMat[i] = newMat;
                         estimatedPos[i] = newMat.Translation;
-                        estimatedRot[i] = newMat.Rotation();
+                        estimatedRot[i] = Quaternion.Normalize(newMat.Rotation());
                         if (final) {
                             trackerPresence[i] -= straightTrackerWeight + trackerStraightness[i];
 
                             int camera = i % cameras.Length;
-                            float min = Utils.GetMap(cameras[camera].quality, 1f, 2f, 50f, 0f) + ((float)Math.Pow(trackerStraightness[i] * 2, 2) * 40);
+                            float min = Utils.GetMap(cameras[camera].quality, 1f, 2f, 10f, 0f) + ((float)Math.Pow(trackerStraightness[i] * 2, 2) * 20);
                             min = (float)Math.Max(min, 0);
+                            if (min >= ticksToFadeTag) min = ticksToFadeTag - 1;
                             if (trackerPresence[i] < min)
                                 trackerPresence[i] = min;
-                            //trackerPresence[i] = min;
                         }
                     }
                 }
-
                 if (availableCount != 0) {
                     availableAvgPos /= availableCount;
                     availableAvgPosDiff /= availableCount;
@@ -704,32 +718,55 @@ namespace TagTracking {
                 //    availableAvgPosDiff /= availableCount;
                 //}
 
+
+                availableAvgRotDiff = prevRot * Quaternion.Inverse(prevx2Rot);
                 //GET PREDICTED MATRIX FOR TAGS THAT ARE NOT SEEN
                 for (int i = 0; i < updateCountCpy.Length; i++) {
-                    if (updateCountCpy[i] > 1) {
+                    if (updateCountCpy[i] >= 2 && updateCountCpy[i] < 1000) {
+                        Quaternion prevAdjust = prevMat[i].Rotation();
+                        prevAdjust.X = prevAdjust.X * 1.0000002f;
+                        prevAdjust.Y = prevAdjust.Y * 1.0000002f;
+                        prevAdjust.Z = prevAdjust.Z * 1.0000002f;
+                        prevAdjust.W = prevAdjust.W * 1.0000008f;
+                        //Type of shit that i have to do when something is not perfect
                         if (availableCount == 0) {
                             estimatedPos[i] = prevMat[i].Translation;
-                            estimatedRot[i] = prevMat[i].Rotation();
+                            //Console.WriteLine(estimatedPos[i]);
+                            estimatedRot[i] = prevAdjust;
+                            //estimatedRot[i] = new Quaternion(0.66621256f, 0.32460567f, 0.38732502f, 0.5484261f);
                         } else {
                             Matrix4x4 newPos = Matrix4x4.CreateTranslation(prevMat[i].Translation - availableAvgPos);
-                            estimatedPos[i] = Matrix4x4.Multiply(newPos, Matrix4x4.CreateFromQuaternion(availableAvgRot)).Translation + availableAvgPos + availableAvgPosDiff;
-                            estimatedRot[i] = availableAvgRot * prevMat[i].Rotation();
+                            estimatedPos[i] = Matrix4x4.Multiply(newPos, Matrix4x4.CreateFromQuaternion(availableAvgRotDiff)).Translation + availableAvgPos + availableAvgPosDiff;
+                            //Matrix4x4 newPos = Matrix4x4.CreateTranslation(prevMat[i].Translation - prevPos);
+                            //estimatedPos[i] = Matrix4x4.Multiply(newPos, Matrix4x4.CreateFromQuaternion(availableAvgRotDiff)).Translation + prevPos + (prevPos - prevx2Pos);
+                            estimatedRot[i] = availableAvgRotDiff * prevAdjust;
                         }
                         if (final) {
+                            //if (trackerPresence[i] < ticksToFadeTag * 0.5f) trackerPresence[i] = ticksToFadeTag * 0.25f;
                             trackerPresence[i] += straightTrackerWeight * 2;
-                            float max = 100 + ((float)Math.Pow(trackerStraightness[i] * 2, 2) * 40);
+                            float max = ticksToFadeTag + ((float)Math.Pow(trackerStraightness[i] * 2, 2) * 20);
                             max = (float)Math.Max(max, 0);
-                            if (trackerPresence[i] > 100)
-                                trackerPresence[i] = 100;
+                            if (trackerPresence[i] > ticksToFadeTag)
+                                trackerPresence[i] = ticksToFadeTag;
                             //trackerPresence[i] = 100;
+
+                            if (trackerPresence[i] < ticksToFadeTag) {
+                                int camera = i % cameras.Length;
+                                int id = trackerIndex[i / cameras.Length];
+                                Program.oscClientDebug.Send($"/debug/trackers/position", id, camera, estimatedPos[i].X, estimatedPos[i].Z, estimatedPos[i].Y, -estimatedRot[i].X, -estimatedRot[i].Z, -estimatedRot[i].Y, estimatedRot[i].W, (int)1);
+                            }
                         }
                     }
                 }
+                //Console.WriteLine(estimatedRot[7]);
 
                 //SET PREVIOUS MATRIX AS CURENT
                 if (final)
                     for (int i = 0; i < estimatedPos.Length; i++) {
                         prevMat[i] = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(estimatedRot[i]), Matrix4x4.CreateTranslation(estimatedPos[i]));
+                        //prevMat[i] = estimatedMat[i];
+                        //if (i == 7)
+                        //    Console.WriteLine(prevMat[i].Translation);
                         //draw current trackers
                         //if (!float.IsNaN(estimatedRot[i].X) && !float.IsNaN(estimatedPos[i].X) && (Program.frameCount / 8) % 2 == 0)
                         //    Aruco.DrawAxis(prevMat[i], Utils.GetMap(trackerPresence[i], 0, 100, 1f, 0.2f));
@@ -744,7 +781,6 @@ namespace TagTracking {
                 //        }
                 //        estimatedRot[i] = filteredRot;
                 //    }
-
                 //GET CENTERED TRACKERS MATRIX
                 for (int i = 0; i < estimatedPos.Length; i++) {
                     Matrix4x4 mat = Matrix4x4.Multiply(Matrix4x4.CreateFromQuaternion(estimatedRot[i]), Matrix4x4.CreateTranslation(estimatedPos[i]));
